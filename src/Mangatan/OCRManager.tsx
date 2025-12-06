@@ -1,11 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { useOCR } from './context/OCRContext';
+import { useState, useEffect } from 'react';
 import { useMangaObserver } from './hooks/useMangaObserver';
 import { ImageOverlay } from './components/ImageOverlay';
 import { SettingsModal } from './components/SettingsModal';
 
 export const OCRManager = () => {
-    const { settings } = useOCR();
     const images = useMangaObserver(); 
     const [showSettings, setShowSettings] = useState(false);
 

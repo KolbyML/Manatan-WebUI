@@ -1,3 +1,5 @@
+import { requestManager } from "@/lib/requests/RequestManager";
+
 declare const GMXmlXttpRequest: any;
 
 export const logDebug = (msg: string, isDebug: boolean) => {
@@ -11,10 +13,14 @@ export const apiRequest = async <T>(
 ): Promise<T> => {
     const isUserScript = typeof GMXmlXttpRequest !== 'undefined';
 
+    const fullUrl = url.startsWith('http')
+        ? url
+        : `${requestManager.getBaseUrl()}${url.startsWith('/') ? '' : '/'}${url}`;
+
     if (isUserScript) {
         return new Promise((resolve, reject) => {
             GMXmlXttpRequest({
-                url,
+                url: fullUrl, // Use fullUrl here
                 method: options.method || 'GET',
                 headers: { 'Content-Type': 'application/json', ...options.headers },
                 data: options.body ? JSON.stringify(options.body) : undefined,
@@ -33,7 +39,8 @@ export const apiRequest = async <T>(
         });
     }
 
-    const response = await fetch(url, {
+    // Standard fetch handles relative URLs fine, but fullUrl doesn't hurt.
+    const response = await fetch(fullUrl, {
         method: options.method || 'GET',
         headers: { 'Content-Type': 'application/json', ...options.headers },
         body: options.body ? JSON.stringify(options.body) : undefined,

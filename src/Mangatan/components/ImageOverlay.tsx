@@ -30,7 +30,11 @@ export const ImageOverlay: React.FC<{ img: HTMLImageElement }> = ({ img }) => {
         }
         const fetchOCR = async () => {
             try {
-                const url = `${settings.ocrServerUrl}/ocr?url=${encodeURIComponent(img.src)}`;
+                // The proxy at /api/ocr/ forwards to localhost:3000/
+                // So /api/ocr/ocr forwards to localhost:3000/ocr
+                const url = `/api/ocr/ocr?url=${encodeURIComponent(img.src)}`;
+                console.log('Fetching OCR for', url);
+                
                 const result = await apiRequest<OcrBlock[]>(url);
                 if (Array.isArray(result)) {
                     updateOcrData(img.src, result);
@@ -44,7 +48,7 @@ export const ImageOverlay: React.FC<{ img: HTMLImageElement }> = ({ img }) => {
         if (img.complete) fetchOCR();
         // eslint-disable-next-line no-param-reassign
         else img.onload = fetchOCR;
-    }, [img.src, settings.ocrServerUrl]);
+    }, [img.src]);
 
     // 2. Position Syncing (Absolute Strategy)
     useEffect(() => {

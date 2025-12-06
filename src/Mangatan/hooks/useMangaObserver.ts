@@ -1,28 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useOCR } from '@/Mangatan/context/OCRContext';
-import { logDebug } from '@/Mangatan/utils/api';
 
 export const useMangaObserver = () => {
     const { settings } = useOCR();
     const [images, setImages] = useState<HTMLImageElement[]>([]);
 
     useEffect(() => {
-        let activeSite = settings.sites.find((site) => window.location.href.includes(site.urlPattern));
-
-        // Fallback for localhost
-        if (!activeSite && window.location.hostname === 'localhost') {
-            // FIX: Use array destructuring for index 0 access
-            [activeSite] = settings.sites;
-        }
-
-        if (!activeSite) {
-            logDebug(`[Observer] No matching site config`, settings.debugMode);
-            // FIX: Return empty cleanup function for consistent-return
-            return () => {};
-        }
-
         // FIX: Use destructuring to satisfy prefer-destructuring
-        const { imageContainerSelectors: selectors } = activeSite;
+        const { imageContainerSelectors: selectors } = settings.site;
 
         const scan = () => {
             const found: HTMLImageElement[] = [];
@@ -60,7 +45,7 @@ export const useMangaObserver = () => {
         observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
 
         return () => observer.disconnect();
-    }, [settings.sites, settings.debugMode]);
+    }, [settings.site, settings.debugMode]);
 
     return images;
 };

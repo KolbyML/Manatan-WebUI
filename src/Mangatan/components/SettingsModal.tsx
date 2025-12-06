@@ -27,7 +27,7 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
         setServerStatus('Checking...');
         try {
             const res = await apiRequest<{ status: string; active_preprocess_jobs?: number }>(
-                localSettings.ocrServerUrl,
+                '/api/ocr/'
             );
             if (res.status === 'running') setServerStatus(`Online (Jobs: ${res.active_preprocess_jobs ?? 0})`);
             else setServerStatus(`Error: ${JSON.stringify(res)}`);
@@ -40,7 +40,7 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
         // eslint-disable-next-line no-restricted-globals, no-alert
         if (!window.confirm('Purge Server Cache?')) return;
         try {
-            await apiRequest(`${localSettings.ocrServerUrl}/purge-cache`, { method: 'POST' });
+            await apiRequest(`/api/ocr/purge-cache`, { method: 'POST' });
             // eslint-disable-next-line no-alert
             window.alert('Cache Purged');
         } catch (e) {
@@ -58,16 +58,12 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                 <div className="ocr-modal-content">
                     <h3>OCR Server</h3>
                     <div className="grid">
-                        {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
-                        <label htmlFor="ocrUrl">URL</label>
-                        <input
-                            id="ocrUrl"
-                            value={localSettings.ocrServerUrl}
-                            onChange={(e) => handleChange('ocrServerUrl', e.target.value)}
-                        />
-                        <button type="button" onClick={checkStatus} style={{ width: 'auto' }}>
-                            {serverStatus}
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gridColumn: '1 / -1' }}>
+                            <span style={{ marginRight: '1rem', fontWeight: 'bold' }}>Server Status:</span>
+                            <button type="button" onClick={checkStatus} style={{ width: 'auto' }}>
+                                {serverStatus}
+                            </button>
+                        </div>
                     </div>
                     <div className="grid">
                         {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
@@ -267,16 +263,11 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                     <textarea
                         id="siteConfig"
                         rows={5}
-                        value={localSettings.sites
-                            .map((s) =>
-                                [
-                                    s.urlPattern,
-                                    s.overflowFixSelector,
-                                    ...s.imageContainerSelectors,
-                                    s.contentRootSelector,
-                                ].join('; '),
-                            )
-                            .join('\n')}
+                        value={[
+                                    localSettings.site.overflowFixSelector,
+                                    ...localSettings.site.imageContainerSelectors,
+                                    localSettings.site.contentRootSelector,
+                                ].join('; ')}
                         onChange={(e) => {
                             const sites = e.target.value
                                 .split('\n')
@@ -284,13 +275,12 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                                 .map((l) => {
                                     const p = l.split(';').map((s) => s.trim());
                                     return {
-                                        urlPattern: p[0],
-                                        overflowFixSelector: p[1],
-                                        imageContainerSelectors: p.slice(2, -1),
+                                        overflowFixSelector: p[0],
+                                        imageContainerSelectors: p.slice(1, -1),
                                         contentRootSelector: p[p.length - 1],
                                     };
                                 });
-                            handleChange('sites', sites);
+                            handleChange('site', sites[0]);
                         }}
                     />
                 </div>

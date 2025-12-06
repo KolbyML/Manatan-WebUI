@@ -13,7 +13,6 @@ export interface OcrBlock {
 }
 
 export interface SiteConfig {
-    urlPattern: string;
     imageContainerSelectors: string[];
     overflowFixSelector?: string;
     contentRootSelector?: string;
@@ -22,7 +21,6 @@ export interface SiteConfig {
 export type ColorTheme = 'blue' | 'red' | 'green' | 'orange' | 'purple' | 'turquoise' | 'pink' | 'grey';
 
 export interface Settings {
-    ocrServerUrl: string;
     imageServerUser?: string;
     imageServerPassword?: string;
     interactionMode: 'hover' | 'click';
@@ -41,7 +39,7 @@ export interface Settings {
     addSpaceOnMerge: boolean;
     deleteModifierKey: string;
     mergeModifierKey: string;
-    sites: SiteConfig[];
+    site: SiteConfig;
 }
 
 export type MergeState = {
@@ -50,7 +48,6 @@ export type MergeState = {
 } | null;
 
 export const DEFAULT_SETTINGS: Settings = {
-    ocrServerUrl: 'http://127.0.0.1:3000',
     interactionMode: 'hover',
     colorTheme: 'blue',
     brightnessMode: 'light',
@@ -67,9 +64,8 @@ export const DEFAULT_SETTINGS: Settings = {
     addSpaceOnMerge: false,
     deleteModifierKey: 'Alt',
     mergeModifierKey: 'Control',
-    sites: [
+    site: 
         {
-            urlPattern: 'localhost',
             imageContainerSelectors: [
                 'div.muiltr-masn8',
                 'div.muiltr-79elbk',
@@ -84,13 +80,6 @@ export const DEFAULT_SETTINGS: Settings = {
             overflowFixSelector: '.MuiBox-root.muiltr-13djdhf',
             contentRootSelector: '#root',
         },
-        {
-            urlPattern: '127.0.0.1',
-            imageContainerSelectors: ['div.muiltr-masn8', '.MuiBox-root.muiltr-1noqzsz', 'img[src*="/api/v1/manga/"]'],
-            overflowFixSelector: '.MuiBox-root.muiltr-13djdhf',
-            contentRootSelector: '#root',
-        },
-    ],
 };
 
 export const COLOR_THEMES: Record<ColorTheme, { accent: string; background: string }> = {
