@@ -16,7 +16,6 @@ import { AwaitableComponent } from 'awaitable-component';
 import { AppContext } from '@/base/contexts/AppContext.tsx';
 import { DefaultNavBar } from '@/features/navigation-bar/components/DefaultNavBar.tsx';
 import { requestManager } from '@/lib/requests/RequestManager.ts';
-import { WebUIUpdateChecker } from '@/features/app-updates/components/WebUIUpdateChecker.tsx';
 import { ServerUpdateChecker } from '@/features/app-updates/components/ServerUpdateChecker.tsx';
 import { lazyLoadFallback } from '@/base/utils/LazyLoad.tsx';
 import { ErrorBoundary } from '@/base/components/feedback/ErrorBoundary.tsx';
@@ -296,7 +295,6 @@ export const App: React.FC = () => (
 
         <AuthGuard>
             <ServerUpdateChecker />
-            <WebUIUpdateChecker />
             <InitialBackgroundRequests />
             <BackgroundSubscriptions />
 
