@@ -6,7 +6,6 @@ import { apiRequest } from '@/Mangatan/utils/api';
 export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const { settings, setSettings } = useOCR();
     const [localSettings, setLocalSettings] = useState(settings);
-    const [serverStatus, setServerStatus] = useState<string>('Click to check');
 
     const handleChange = (key: keyof typeof settings, value: any) => {
         setLocalSettings((prev) => ({ ...prev, [key]: value }));
@@ -21,19 +20,6 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
     const resetToDefaults = () => {
         // eslint-disable-next-line no-restricted-globals, no-alert
         if (window.confirm('Reset all settings to default?')) setLocalSettings(DEFAULT_SETTINGS);
-    };
-
-    const checkStatus = async () => {
-        setServerStatus('Checking...');
-        try {
-            const res = await apiRequest<{ status: string; active_preprocess_jobs?: number }>(
-                '/api/ocr/'
-            );
-            if (res.status === 'running') setServerStatus(`Online (Jobs: ${res.active_preprocess_jobs ?? 0})`);
-            else setServerStatus(`Error: ${JSON.stringify(res)}`);
-        } catch (e) {
-            setServerStatus('Connection Failed');
-        }
     };
 
     const purgeCache = async () => {
@@ -56,15 +42,7 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                     <h2>Settings</h2>
                 </div>
                 <div className="ocr-modal-content">
-                    <h3>OCR Server</h3>
-                    <div className="grid">
-                        <div style={{ display: 'flex', alignItems: 'center', gridColumn: '1 / -1' }}>
-                            <span style={{ marginRight: '1rem', fontWeight: 'bold' }}>Server Status:</span>
-                            <button type="button" onClick={checkStatus} style={{ width: 'auto' }}>
-                                {serverStatus}
-                            </button>
-                        </div>
-                    </div>
+                    <h3>Suwayomi Server Login (Leave Empty if auth not set)</h3>
                     <div className="grid">
                         {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
                         <label htmlFor="ocrUser">User (Opt)</label>
