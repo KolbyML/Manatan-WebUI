@@ -137,8 +137,8 @@ export function About() {
                         secondary="https://github.com/KolbyML/Suwayomi-WebUI"
                     />
                 </ListItemLink>
-                <ListItemLink to={aboutServer.discord} target="_blank" rel="noreferrer">
-                    <ListItemText primary={t('global.label.discord')} secondary={aboutServer.discord} />
+                <ListItemLink to="https://discord.gg/tDAtpPN8KK" target="_blank" rel="noreferrer">
+                    <ListItemText primary={t('global.label.discord')} secondary="https://discord.gg/tDAtpPN8KK" />
                 </ListItemLink>
             </List>
         </List>
