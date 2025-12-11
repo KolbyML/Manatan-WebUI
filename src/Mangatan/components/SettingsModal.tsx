@@ -3,6 +3,21 @@ import { useOCR } from '@/Mangatan/context/OCRContext';
 import { COLOR_THEMES, DEFAULT_SETTINGS } from '@/Mangatan/types';
 import { apiRequest } from '@/Mangatan/utils/api';
 
+const checkboxLabelStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    marginBottom: '8px',
+    cursor: 'pointer',
+    textAlign: 'left', 
+};
+
+const checkboxInputStyle: React.CSSProperties = {
+    width: 'auto',      
+    marginRight: '10px',  
+    flexShrink: 0,     
+    cursor: 'pointer',
+};
+
 export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const { settings, setSettings } = useOCR();
     const [localSettings, setLocalSettings] = useState(settings);
@@ -195,44 +210,61 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                     </div>
 
                     <div className="checkboxes">
-                        {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
-                        <label>
+                        {/* Enable Overlay */}
+                        <label style={checkboxLabelStyle}>
+                            <input
+                                type="checkbox"
+                                checked={localSettings.enableOverlay}
+                                onChange={(e) => handleChange('enableOverlay', e.target.checked)}
+                                style={checkboxInputStyle}
+                            />
+                            Enable Text Overlay (If disabled, no OCR text will show)
+                        </label>
+
+                        {/* Solo Hover */}
+                        <label style={checkboxLabelStyle}>
                             <input
                                 type="checkbox"
                                 checked={localSettings.soloHoverMode}
                                 onChange={(e) => handleChange('soloHoverMode', e.target.checked)}
+                                style={checkboxInputStyle}
                             />
                             Solo Hover (Hide others when hovering one)
                         </label>
-                        {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
-                        <label>
+
+                        {/* Add Space on Merge */}
+                        <label style={checkboxLabelStyle}>
                             <input
                                 type="checkbox"
                                 checked={localSettings.addSpaceOnMerge}
                                 onChange={(e) => handleChange('addSpaceOnMerge', e.target.checked)}
+                                style={checkboxInputStyle}
                             />
                             Add Space on Merge
                         </label>
-                        {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
-                        <label>
+
+                        {/* Mobile Mode */}
+                        <label style={checkboxLabelStyle}>
                             <input
                                 type="checkbox"
                                 checked={localSettings.mobileMode}
                                 onChange={(e) => handleChange('mobileMode', e.target.checked)}
+                                style={checkboxInputStyle}
                             />
                             Mobile Mode (No Animation)
                         </label>
-                        {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
-                        <label>
+
+                        {/* Debug Mode */}
+                        <label style={checkboxLabelStyle}>
                             <input
                                 type="checkbox"
                                 checked={localSettings.debugMode}
                                 onChange={(e) => handleChange('debugMode', e.target.checked)}
+                                style={checkboxInputStyle}
                             />
                             Debug Mode
                         </label>
                     </div>
-
                     <h3>Site Config</h3>
                     {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
                     <label htmlFor="siteConfig" style={{ display: 'none' }}>

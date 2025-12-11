@@ -36,6 +36,7 @@ export interface Settings {
     debugMode: boolean;
     mobileMode: boolean;
     soloHoverMode: boolean;
+    enableOverlay: boolean;
     addSpaceOnMerge: boolean;
     deleteModifierKey: string;
     mergeModifierKey: string;
@@ -61,6 +62,7 @@ export const DEFAULT_SETTINGS: Settings = {
     debugMode: false,
     mobileMode: false,
     soloHoverMode: true,
+    enableOverlay: true,
     addSpaceOnMerge: false,
     deleteModifierKey: 'Alt',
     mergeModifierKey: 'Control',
