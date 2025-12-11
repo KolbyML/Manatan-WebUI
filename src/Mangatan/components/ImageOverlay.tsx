@@ -225,8 +225,8 @@ export const ImageOverlay: React.FC<{ img: HTMLImageElement }> = ({ img }) => {
             {/* Logic: If we are visible, map the boxes. 
          We do NOT filter data based on hover here; CSS handles the hiding in Solo Mode. 
       */}
-            {(isVisible || settings.interactionMode === 'click' || settings.mobileMode || settings.debugMode) &&
-                data.map((block, i) => (
+            {settings.enableOverlay && (isVisible || settings.interactionMode === 'click' || settings.mobileMode || settings.debugMode) &&
+            data.map((block, i) => (
                     <TextBox
                         // eslint-disable-next-line react/no-array-index-key
                         key={`${i}-${block.text.substring(0, 5)}`}
