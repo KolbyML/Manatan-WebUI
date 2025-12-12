@@ -264,6 +264,15 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                             />
                             Debug Mode
                         </label>
+                        <label style={checkboxLabelStyle}>
+                            <input
+                                type="checkbox"
+                                checked={localSettings.disableStatusIcon}
+                                onChange={(e) => handleChange('disableStatusIcon', e.target.checked)}
+                                style={checkboxInputStyle}
+                            />
+                            Disable Status Icon (Hide loading/error spinner for OCR status)
+                        </label>
                     </div>
                     <h3>Site Config</h3>
                     {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}

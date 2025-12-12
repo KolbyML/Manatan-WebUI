@@ -38,6 +38,7 @@ export interface Settings {
     soloHoverMode: boolean;
     enableOverlay: boolean;
     addSpaceOnMerge: boolean;
+    disableStatusIcon: boolean;
     deleteModifierKey: string;
     mergeModifierKey: string;
     site: SiteConfig;
@@ -64,6 +65,7 @@ export const DEFAULT_SETTINGS: Settings = {
     soloHoverMode: true,
     enableOverlay: true,
     addSpaceOnMerge: false,
+    disableStatusIcon: false,
     deleteModifierKey: 'Alt',
     mergeModifierKey: 'Control',
     site: 
