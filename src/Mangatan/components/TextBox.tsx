@@ -4,41 +4,24 @@ import { useOCR } from '@/Mangatan/context/OCRContext';
 import { cleanPunctuation } from '@/Mangatan/utils/api';
 
 const calculateFontSize = (text: string, w: number, h: number, isVertical: boolean, settings: any) => {
-    // 1. Analyze Structure
     const lines = text.split('\n');
     const lineCount = lines.length || 1;
-    // Calculate max length of any single line
     const maxLineLength = Math.max(...lines.map((l) => l.length)) || 1;
-
     let size = 16;
-
-    // Buffer to prevent text touching borders (15% padding)
     const safeW = w * 0.85;
     const safeH = h * 0.85;
 
     if (isVertical) {
-        // Vertical Text:
-        // Width constrains the NUMBER OF COLUMNS (lines)
         const maxFontSizeByWidth = safeW / lineCount;
-
-        // Height constrains the LENGTH OF THE LONGEST LINE
         const maxFontSizeByHeight = safeH / maxLineLength;
-
         size = Math.min(maxFontSizeByWidth, maxFontSizeByHeight);
         size *= settings.fontMultiplierVertical;
     } else {
-        // Horizontal Text:
-        // Height constrains the NUMBER OF LINES
         const maxFontSizeByHeight = safeH / lineCount;
-
-        // Width constrains the LENGTH OF THE LONGEST LINE
         const maxFontSizeByWidth = safeW / maxLineLength;
-
         size = Math.min(maxFontSizeByHeight, maxFontSizeByWidth);
         size *= settings.fontMultiplierHorizontal;
     }
-
-    // Clamp font size to sane limits
     return Math.max(10, Math.min(size, 200));
 };
 
@@ -61,7 +44,6 @@ export const TextBox: React.FC<{
         (settings.textOrientation === 'smart' && block.tightBoundingBox.height > block.tightBoundingBox.width * 1.5) ||
         settings.textOrientation === 'forceVertical';
 
-    // Box Adjustment (Padding) from settings
     const adj = settings.boundingBoxAdjustment || 0;
 
     useLayoutEffect(() => {
@@ -70,12 +52,66 @@ export const TextBox: React.FC<{
         const pxH = block.tightBoundingBox.height * containerRect.height;
 
         if (!isEditing) {
-            // Replicate the exact display string for calculation (replacing zero-width spaces with newlines)
             const displayTxt = cleanPunctuation(block.text).replace(/\u200B/g, '\n');
-            // We calculate using the *expanded* box size (pxW + adj)
             setFontSize(calculateFontSize(displayTxt, pxW + adj, pxH + adj, isVertical, settings));
         }
     }, [block, containerRect, settings, isEditing, isVertical]);
+
+    // --- HELPER: Find Scroll Container from Image ---
+    // This is the most robust method: Find the image this box belongs to, 
+    // and find WHO is holding that image.
+    const findScrollContainerFromImage = (src: string): HTMLElement | null => {
+        // Find the image element in the DOM
+        const img = document.querySelector(`img[src="${src}"]`);
+        if (!img) return null;
+
+        let parent = img.parentElement;
+        while (parent && parent !== document.body) {
+            const style = window.getComputedStyle(parent);
+            // Check for explicit scroll settings
+            if ((style.overflowY === 'auto' || style.overflowY === 'scroll') && parent.scrollHeight > parent.clientHeight) {
+                return parent;
+            }
+            parent = parent.parentElement;
+        }
+        return null;
+    };
+
+    // --- UPDATED: Handle Wheel Events ---
+    const handleWheel = (e: React.WheelEvent) => {
+        if (isEditing) return;
+
+        // 1. Try to find the container based on the source image (Highest Accuracy)
+        const containerFromImg = findScrollContainerFromImage(imgSrc);
+        if (containerFromImg) {
+            containerFromImg.scrollTop += e.deltaY;
+            return;
+        }
+
+        // 2. Fallback: Bubbling search from cursor position
+        // Useful if the image selector fails for some reason
+        if (ref.current) {
+            ref.current.style.pointerEvents = 'none';
+            const elementUnder = document.elementFromPoint(e.clientX, e.clientY);
+            ref.current.style.pointerEvents = '';
+
+            let target = elementUnder;
+            while (target && target !== document.body && target !== document.documentElement) {
+                const el = target as HTMLElement;
+                const style = window.getComputedStyle(el);
+                
+                if ((style.overflowY === 'auto' || style.overflowY === 'scroll') && el.scrollHeight > el.clientHeight) {
+                    el.scrollTop += e.deltaY;
+                    return;
+                }
+                target = target.parentElement;
+            }
+        }
+        
+        // 3. NO WINDOW SCROLL FALLBACK
+        // We explicitly do NOT call window.scrollBy here. 
+        // This prevents the "scroll off page" glitch.
+    };
 
     const handleInteract = (e: React.MouseEvent) => {
         const selection = window.getSelection();
@@ -100,15 +136,12 @@ export const TextBox: React.FC<{
         }
     };
 
-    // Fix for jsx-a11y/click-events-have-key-events
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (isEditing) return;
-        // Allow entering edit mode via Enter or Space
         if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             setIsEditing(true);
         }
-        // Allow delete via Delete key
         if (e.key === 'Delete') {
             e.preventDefault();
             onDelete(index);
@@ -116,18 +149,16 @@ export const TextBox: React.FC<{
     };
 
     const isMergedTarget = mergeAnchor?.imgSrc === imgSrc && mergeAnchor?.index === index;
-
-    // Final Content Logic
     let content = isEditing ? block.text : cleanPunctuation(block.text);
     content = content.replace(/\u200B/g, '\n');
 
     return (
         <div
             ref={ref}
-            // Accessibility Props
             role="button"
             tabIndex={0}
             onKeyDown={handleKeyDown}
+            onWheel={handleWheel} 
             className={`gemini-ocr-text-box ${isVertical ? 'vertical' : ''} ${isEditing ? 'editing' : ''} ${isMergedTarget ? 'merge-target' : ''}`}
             contentEditable={isEditing}
             suppressContentEditableWarning
@@ -135,7 +166,6 @@ export const TextBox: React.FC<{
             onBlur={() => {
                 setIsEditing(false);
                 const raw = ref.current?.innerText || '';
-                // When saving, convert back to zero-width space format
                 if (raw !== content) onUpdate(index, raw.replace(/\n/g, '\u200B'));
             }}
             onClick={handleInteract}
@@ -148,6 +178,8 @@ export const TextBox: React.FC<{
                 color: settings.focusFontColor === 'difference' ? 'white' : 'var(--ocr-text-color)',
                 mixBlendMode: settings.focusFontColor === 'difference' ? 'difference' : 'normal',
                 whiteSpace: 'pre',
+                overflow: isEditing ? 'auto' : 'hidden', 
+                touchAction: 'pan-y', 
             }}
         >
             {content}
