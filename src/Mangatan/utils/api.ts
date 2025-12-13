@@ -53,12 +53,16 @@ const resolveChapterId = async (mangaId: number, chapterNumber: number): Promise
         throw new Error("Failed to retrieve chapter list from GraphQL");
     }
 
-    // Find the chapter node where the number matches
-    // Note: API might return number or string, so we cast to Number for comparison
-    const match = chapters.find((ch: any) => Number(ch.chapterNumber) === chapterNumber);
+    const hasChapterZero = chapters.some((ch: any) => Number(ch.chapterNumber) === 0);
+
+    let targetChapterNum = chapterNumber;
+    if (hasChapterZero) {
+        targetChapterNum -= 1;
+    }
+    const match = chapters.find((ch: any) => Number(ch.chapterNumber) === targetChapterNum);
 
     if (!match) {
-        throw new Error(`Chapter number ${chapterNumber} not found in manga ${mangaId}`);
+        throw new Error(`Chapter number ${targetChapterNum} (original: ${chapterNumber}) not found in manga ${mangaId}`);
     }
 
     return parseInt(match.id, 10);
