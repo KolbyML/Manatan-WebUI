@@ -34,7 +34,7 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
 
     const resetToDefaults = () => {
         // eslint-disable-next-line no-restricted-globals, no-alert
-        if (window.confirm('Reset all settings to default?2')) {
+        if (window.confirm('Reset all settings to default?')) {
             const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             
             setLocalSettings({
