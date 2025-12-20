@@ -55,7 +55,11 @@ export const SnackbarWithDescription = memo(
             ? finalDescription?.slice(0, MAX_DESCRIPTION_LENGTH)
             : finalDescription;
 
-        const TitleComponent = actualDescription?.length ? AlertTitle : Fragment;
+        // Logic check: Do we need a bold Title, or just body text?
+        const hasDescription = !!actualDescription?.length;
+
+        // Helper to determine if we can use ghost text (must be string)
+        const isMessageString = typeof message === 'string';
 
         return (
             <SnackbarContent ref={ref}>
@@ -78,8 +82,36 @@ export const SnackbarWithDescription = memo(
                     }}
                     onClose={() => closeSnackbar(id)}
                 >
-                    <TitleComponent>{message}</TitleComponent>
-                    {actualDescription}
+                    {/* --- TITLE / MESSAGE AREA --- */}
+                    {hasDescription ? (
+                        /* Case A: We have a description, so 'message' acts as a Title */
+                        <AlertTitle
+                            className={isMessageString ? "yomitan-ghost-text" : "no-yomitan-select"}
+                            data-text={isMessageString ? message : undefined}
+                        >
+                            {/* If it's a string, hide children (ghost text handles it). If component, render normally. */}
+                            {isMessageString ? null : message}
+                        </AlertTitle>
+                    ) : (
+                        /* Case B: No description, 'message' is just the body */
+                        <span
+                            className={isMessageString ? "yomitan-ghost-text" : "no-yomitan-select"}
+                            data-text={isMessageString ? message : undefined}
+                        >
+                            {isMessageString ? null : message}
+                        </span>
+                    )}
+
+                    {/* --- DESCRIPTION AREA --- */}
+                    {hasDescription && (
+                        <span 
+                            className="yomitan-ghost-text"
+                            data-text={actualDescription}
+                            style={{ display: 'block', marginTop: '4px' }} 
+                        />
+                    )}
+
+                    {/* --- SHOW MORE BUTTON --- */}
                     {isDescriptionTooLong || (isGraphqlException && graphqlStackTrace) ? (
                         <Button
                             onClick={() => {
@@ -101,7 +133,8 @@ export const SnackbarWithDescription = memo(
                             }}
                             size="small"
                         >
-                            {t('global.button.show_more')}
+                            {/* Fix button text as well just in case */}
+                            <span className="yomitan-ghost-text" data-text={t('global.button.show_more')} />
                         </Button>
                     ) : (
                         ''
