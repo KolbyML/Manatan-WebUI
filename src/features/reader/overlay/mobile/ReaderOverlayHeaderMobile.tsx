@@ -77,12 +77,16 @@ const BaseReaderOverlayHeaderMobile = ({ isVisible, ref }: MobileHeaderProps & {
                                         to={AppRoutes.manga.path(mangaId)}
                                         sx={{ textDecoration: 'none', color: 'inherit' }}
                                     >
-                                        {title}
+                                        {/* FIX 1: Manga Title */}
+                                        <span className="yomitan-ghost-text" data-text={title} />
                                     </Link>
                                 </TypographyMaxLines>
                             </CustomTooltip>
                             <CustomTooltip title={name}>
-                                <TypographyMaxLines lines={1}>{name}</TypographyMaxLines>
+                                <TypographyMaxLines lines={1}>
+                                    {/* FIX 2: Chapter Name */}
+                                    <span className="yomitan-ghost-text" data-text={name} />
+                                </TypographyMaxLines>
                             </CustomTooltip>
                         </>
                     ) : (
@@ -102,7 +106,8 @@ const BaseReaderOverlayHeaderMobile = ({ isVisible, ref }: MobileHeaderProps & {
                         rel="noreferrer"
                         target="_blank"
                     >
-                        {t('global.button.open_browser')}
+                        {/* FIX 3: Menu Item (Open in Browser) */}
+                        <span className="yomitan-ghost-text" data-text={t('global.button.open_browser')} />
                     </MenuItem>
                     <MenuItem
                         component={Link}
@@ -111,7 +116,8 @@ const BaseReaderOverlayHeaderMobile = ({ isVisible, ref }: MobileHeaderProps & {
                         rel="noreferrer"
                         target="_blank"
                     >
-                        {t('global.button.open_webview')}
+                        {/* FIX 4: Menu Item (Open in Webview) */}
+                        <span className="yomitan-ghost-text" data-text={t('global.button.open_webview')} />
                     </MenuItem>
                     <MenuItem
                         disabled={!realUrl}
@@ -120,7 +126,8 @@ const BaseReaderOverlayHeaderMobile = ({ isVisible, ref }: MobileHeaderProps & {
                             makeToast(t('global.label.copied_clipboard'), 'info');
                         }}
                     >
-                        {t('global.label.share')}
+                        {/* FIX 5: Menu Item (Share/Copy) */}
+                        <span className="yomitan-ghost-text" data-text={t('global.label.share')} />
                     </MenuItem>
                 </Menu>
             </Stack>

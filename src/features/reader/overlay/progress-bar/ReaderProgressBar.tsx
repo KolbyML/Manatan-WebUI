@@ -159,6 +159,9 @@ const BaseReaderProgressBar = ({
         <ReaderProgressBarContainer {...slotProps?.container} progressBarPosition={progressBarPosition}>
             <ReaderProgressBarRoot {...slotProps?.progressBarRoot}>
                 <ReaderProgressBarPageNumber
+                    className="yomitan-ghost-text"
+                    // @ts-ignore
+                    data-text={currentPage.name}
                     {...slotProps?.progressBarPageTexts?.base}
                     {...slotProps?.progressBarPageTexts?.current}
                     sx={[
@@ -171,9 +174,8 @@ const BaseReaderProgressBar = ({
                             : [slotProps?.progressBarPageTexts?.current?.sx]),
                     ]}
                     onClick={() => ReaderControls.openPage('previous', 'ltr', false)}
-                >
-                    {currentPage.name}
-                </ReaderProgressBarPageNumber>
+                /> {/* SELF CLOSING - No children! */}
+                
                 <ClickAwayListener onClickAway={() => setIsDragging(false)}>
                     <ReaderProgressBarSlotsActionArea
                         {...slotProps?.progressBarSlotsActionArea}
@@ -220,8 +222,12 @@ const BaseReaderProgressBar = ({
                         </ReaderProgressBarCurrentPageSlot>
                     </ReaderProgressBarSlotsActionArea>
                 </ClickAwayListener>
+                
                 <ReaderProgressBarPageNumber
                     ref={totalPagesTextRef}
+                    className="yomitan-ghost-text"
+                    // @ts-ignore
+                    data-text={totalPages}
                     {...slotProps?.progressBarPageTexts?.base}
                     {...slotProps?.progressBarPageTexts?.total}
                     sx={[
@@ -236,9 +242,7 @@ const BaseReaderProgressBar = ({
                             : [slotProps?.progressBarPageTexts?.total?.sx]),
                     ]}
                     onClick={() => ReaderControls.openPage('next', 'ltr', false)}
-                >
-                    {totalPages}
-                </ReaderProgressBarPageNumber>
+                /> {/* SELF CLOSING - No children! */}
             </ReaderProgressBarRoot>
         </ReaderProgressBarContainer>
     );
