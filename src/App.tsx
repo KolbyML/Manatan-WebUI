@@ -294,7 +294,6 @@ export const App: React.FC = () => (
         <AwaitableComponent.Root />
 
         <AuthGuard>
-            <ServerUpdateChecker />
             <InitialBackgroundRequests />
             <BackgroundSubscriptions />
 
