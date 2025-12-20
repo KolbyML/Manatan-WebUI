@@ -84,7 +84,17 @@ const BaseReaderPageNumber = ({
                     backgroundColor: 'rgba(0, 0, 0, 0.3)',
                 }}
             >
-                <Typography sx={{ color: 'white' }}>{pageName}</Typography>
+                {/* 
+                    CHANGE: 
+                    1. Added class 'yomitan-ghost-text'
+                    2. Moved text to data-text={pageName}
+                    3. Removed children (self-closing tag)
+                */}
+                <Typography 
+                    className="yomitan-ghost-text"
+                    data-text={pageName}
+                    sx={{ color: 'white' }} 
+                />
             </Box>
         </Stack>
     );
