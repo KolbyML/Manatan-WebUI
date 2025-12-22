@@ -1,13 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
-import { Settings, DEFAULT_SETTINGS, MergeState, OcrBlock, COLOR_THEMES, ServerSettingsData } from '@/Mangatan/types';
+import { Settings, DEFAULT_SETTINGS, MergeState, OcrBlock, COLOR_THEMES, ServerSettingsData, DictPopupState, OcrStatus } from '@/Mangatan/types';
 import { requestManager } from '@/lib/requests/RequestManager';
-
-export type OcrStatus = 'loading' | 'error' | 'success' | 'idle';
 
 interface OCRContextType {
     settings: Settings;
     setSettings: React.Dispatch<React.SetStateAction<Settings>>;
-    serverSettings: ServerSettingsData | null; // EXPOSED LIVE SETTINGS
+    serverSettings: ServerSettingsData | null;
     ocrCache: Map<string, OcrBlock[]>;
     updateOcrData: (imgSrc: string, data: OcrBlock[]) => void;
     ocrStatusMap: Map<string, OcrStatus>;
@@ -16,6 +14,11 @@ interface OCRContextType {
     setMergeAnchor: React.Dispatch<React.SetStateAction<MergeState>>;
     activeImageSrc: string | null;
     setActiveImageSrc: React.Dispatch<React.SetStateAction<string | null>>;
+    
+    // Dictionary State
+    dictPopup: DictPopupState;
+    setDictPopup: React.Dispatch<React.SetStateAction<DictPopupState>>;
+
     debugLog: string[];
     addLog: (msg: string) => void;
 }
@@ -23,23 +26,20 @@ interface OCRContextType {
 const OCRContext = createContext<OCRContextType | undefined>(undefined);
 
 export const OCRProvider = ({ children }: { children: ReactNode }) => {
-    // 1. Hook into Global Request Manager (Apollo Store)
     const { data: serverSettingsData } = requestManager.useGetServerSettings();
     const serverSettings: ServerSettingsData | null = serverSettingsData?.settings || null;
 
     const [settings, setSettings] = useState<Settings>(() => {
-        const saved = localStorage.getItem('mangatan_settings_v3');
+        try {
+            const saved = localStorage.getItem('mangatan_settings_v3');
+            if (saved) {
+                return { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
+            }
+        } catch (e) { console.error("Failed to load settings", e); }
         
-        if (saved) {
-            return { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
-        }
-
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        
-        return { 
-            ...DEFAULT_SETTINGS, 
-            mobileMode: isMobile 
-        };
+        const isiOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+        return { ...DEFAULT_SETTINGS, mobileMode: isMobile, enableYomitan: isiOS };
     });
 
     const [ocrCache, setOcrCache] = useState<Map<string, OcrBlock[]>>(new Map());
@@ -48,12 +48,21 @@ export const OCRProvider = ({ children }: { children: ReactNode }) => {
     const [activeImageSrc, setActiveImageSrc] = useState<string | null>(null);
     const [debugLog, setDebugLog] = useState<string[]>([]);
 
+    // Initialize Dictionary State
+    const [dictPopup, setDictPopup] = useState<DictPopupState>({
+        visible: false,
+        x: 0,
+        y: 0,
+        results: [],
+        isLoading: false,
+        systemLoading: false
+    });
+
     const addLog = useCallback(
         (msg: string) => {
             if (!settings.debugMode) return;
             const entry = `[${new Date().toLocaleTimeString()}] ${msg}`;
             setDebugLog((prev) => [...prev.slice(-99), entry]);
-             // eslint-disable-next-line no-console
             console.log(`[OCR] ${entry}`);
         },
         [settings.debugMode],
@@ -92,7 +101,7 @@ export const OCRProvider = ({ children }: { children: ReactNode }) => {
         () => ({
             settings,
             setSettings,
-            serverSettings, // Exposed here
+            serverSettings,
             ocrCache,
             updateOcrData,
             ocrStatusMap, 
@@ -101,10 +110,12 @@ export const OCRProvider = ({ children }: { children: ReactNode }) => {
             setMergeAnchor,
             activeImageSrc,
             setActiveImageSrc,
+            dictPopup,
+            setDictPopup,
             debugLog,
             addLog,
         }),
-        [settings, serverSettings, ocrCache, updateOcrData, ocrStatusMap, setOcrStatus, mergeAnchor, activeImageSrc, debugLog, addLog],
+        [settings, serverSettings, ocrCache, updateOcrData, ocrStatusMap, setOcrStatus, mergeAnchor, activeImageSrc, dictPopup, debugLog, addLog],
     );
 
     return <OCRContext.Provider value={contextValue}>{children}</OCRContext.Provider>;

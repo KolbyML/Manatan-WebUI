@@ -1,3 +1,5 @@
+import { DictionaryResult } from '../types';
+
 export type AuthCredentials = { user?: string; pass?: string };
 
 export type ChapterStatus = 
@@ -83,6 +85,55 @@ export const fetchChapterPagesGraphQL = async (chapterId: number) => {
     return json.data?.fetchChapterPages?.pages as string[] | undefined;
 };
 
+// --- SAFE API REQUEST WRAPPER ---
+export const apiRequest = async <T>(
+    url: string,
+    options: { method?: string; body?: any; headers?: any } = {},
+): Promise<T> => {
+    const fullUrl = url.startsWith('http') ? url : `${window.location.origin}${url}`;
+    
+    const response = await fetch(fullUrl, {
+        method: options.method || 'GET',
+        headers: { 'Content-Type': 'application/json', ...options.headers },
+        body: options.body ? JSON.stringify(options.body) : undefined,
+    });
+
+    const text = await response.text();
+    if (!text) return {} as T;
+
+    try {
+        return JSON.parse(text);
+    } catch (e) {
+        console.warn(`[API] Response from ${url} was not JSON:`, text.substring(0, 50));
+        return {} as T; 
+    }
+};
+
+// --- YOMITAN LOOKUP (FIXED) ---
+export const lookupYomitan = async (text: string, index: number = 0): Promise<DictionaryResult[] | 'loading'> => {
+    try {
+        const url = `/api/yomitan/lookup?text=${encodeURIComponent(text)}&index=${index}`;
+        console.log(`[Yomitan] Fetching: ${url}`); 
+        
+        const res = await apiRequest<any>(url);
+        
+        if (res && res.error === 'loading') {
+            return 'loading';
+        }
+
+        if (Array.isArray(res)) {
+            // FIX: Return the array directly. 
+            // The previous code was mapping 'entry.term', which didn't exist in your JSON.
+            return res as DictionaryResult[];
+        }
+        
+        return [];
+    } catch (e) {
+        console.error("Lookup failed:", e);
+        return [];
+    }
+};
+
 export const checkChapterStatus = async (baseUrl: string, creds?: AuthCredentials): Promise<ChapterStatus> => {
     try {
         const body: any = { base_url: baseUrl, context: 'Check Status' };
@@ -141,7 +192,7 @@ export const preprocessChapter = async (baseUrl: string, chapterPath: string, cr
 
     const body: any = { 
         base_url: baseUrl, 
-        context: document.title,
+        context: document.title, 
         pages: absolutePages 
     };
     if (creds?.user) body.user = creds.user;
@@ -155,20 +206,6 @@ export const preprocessChapter = async (baseUrl: string, chapterPath: string, cr
 
 export const logDebug = (msg: string, isDebug: boolean) => {
     if (isDebug) console.log(`[OCR PC Hybrid] ${new Date().toLocaleTimeString()} ${msg}`);
-};
-
-export const apiRequest = async <T>(
-    url: string,
-    options: { method?: string; body?: any; headers?: any } = {},
-): Promise<T> => {
-    const fullUrl = url.startsWith('http') ? url : `${window.location.origin}${url}`;
-    const response = await fetch(fullUrl, {
-        method: options.method || 'GET',
-        headers: { 'Content-Type': 'application/json', ...options.headers },
-        body: options.body ? JSON.stringify(options.body) : undefined,
-    });
-    const json = await response.json();
-    return json;
 };
 
 export const cleanPunctuation = (text: string): string => {

@@ -8,3 +8,5 @@ build/*
 dev-dist/*
 
 src/lib/graphql/schema.json
+
+**.DS_Store

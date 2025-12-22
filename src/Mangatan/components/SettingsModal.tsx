@@ -36,10 +36,12 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
         // eslint-disable-next-line no-restricted-globals, no-alert
         if (window.confirm('Reset all settings to default?')) {
             const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            const isiOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
             
             setLocalSettings({
                 ...DEFAULT_SETTINGS,
-                mobileMode: isMobile
+                mobileMode: isMobile,
+                enableYomitan: isiOS
             });
         }
     };
@@ -205,6 +207,16 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                                 style={checkboxInputStyle}
                             />
                             Enable Text Overlay (If disabled, no OCR text will show)
+                        </label>
+
+                        <label style={checkboxLabelStyle}>
+                            <input 
+                                type="checkbox"
+                                checked={localSettings.enableYomitan}
+                                onChange={e => handleChange('enableYomitan', e.target.checked)}
+                                style={checkboxInputStyle}
+                            />
+                            Enable builtin Popup Dictionary (Yomitan clone)
                         </label>
 
                         {/* Solo Hover */}

@@ -1,9 +1,4 @@
-export interface Rect {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-}
+export interface Rect { x: number; y: number; width: number; height: number; }
 
 export interface OcrBlock {
     text: string;
@@ -20,11 +15,7 @@ export interface SiteConfig {
 
 export type ColorTheme = 'blue' | 'red' | 'green' | 'orange' | 'purple' | 'turquoise' | 'pink' | 'grey';
 
-// Subset of the Global Server Settings we care about
-export interface ServerSettingsData {
-    authUsername?: string;
-    authPassword?: string;
-}
+export interface ServerSettingsData { authUsername?: string; authPassword?: string; }
 
 export interface Settings {
     interactionMode: 'hover' | 'click';
@@ -43,15 +34,40 @@ export interface Settings {
     enableOverlay: boolean;
     addSpaceOnMerge: boolean;
     disableStatusIcon: boolean;
+    enableYomitan: boolean;
     deleteModifierKey: string;
     mergeModifierKey: string;
     site: SiteConfig;
 }
 
-export type MergeState = {
-    imgSrc: string;
-    index: number;
-} | null;
+export type MergeState = { imgSrc: string; index: number; } | null;
+
+// --- YOMITAN / DICTIONARY TYPES ---
+
+export interface DictionaryResult {
+    headword: string;
+    reading: string;
+    // Array of [kanji, reading] tuples
+    furigana?: string[][]; 
+    definitions: DictionaryDefinition[];
+    forms?: { headword: string; reading: string }[];
+    source?: number;
+}
+
+export interface DictionaryDefinition {
+    dictionaryName: string;
+    tags: string[];
+    content: string[]; // JSON-encoded strings
+}
+
+export interface DictPopupState {
+    visible: boolean;
+    x: number;
+    y: number;
+    results: DictionaryResult[];
+    isLoading: boolean;
+    systemLoading?: boolean;
+}
 
 export const DEFAULT_SETTINGS: Settings = {
     interactionMode: 'hover',
@@ -70,18 +86,14 @@ export const DEFAULT_SETTINGS: Settings = {
     enableOverlay: true,
     addSpaceOnMerge: false,
     disableStatusIcon: false,
+    enableYomitan: false,
     deleteModifierKey: 'Alt',
     mergeModifierKey: 'Control',
     site: {
         imageContainerSelectors: [
-            'div.muiltr-masn8',
-            'div.muiltr-79elbk',
-            'div.muiltr-u43rde',
-            'div.muiltr-1r1or1s',
-            'div.muiltr-18sieki',
-            'div.muiltr-cns6dc',
-            '.MuiBox-root.muiltr-1noqzsz',
-            '.MuiBox-root.muiltr-1tapw32',
+            'div.muiltr-masn8', 'div.muiltr-79elbk', 'div.muiltr-u43rde',
+            'div.muiltr-1r1or1s', 'div.muiltr-18sieki', 'div.muiltr-cns6dc',
+            '.MuiBox-root.muiltr-1noqzsz', '.MuiBox-root.muiltr-1tapw32',
             'img[src*="/api/v1/manga/"]',
         ],
         overflowFixSelector: '.MuiBox-root.muiltr-13djdhf',

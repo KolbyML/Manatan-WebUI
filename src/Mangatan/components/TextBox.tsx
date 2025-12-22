@@ -1,7 +1,7 @@
 import React, { useRef, useState, useLayoutEffect } from 'react';
 import { OcrBlock } from '@/Mangatan/types';
 import { useOCR } from '@/Mangatan/context/OCRContext';
-import { cleanPunctuation } from '@/Mangatan/utils/api';
+import { cleanPunctuation, lookupYomitan } from '@/Mangatan/utils/api';
 
 const calculateFontSize = (text: string, w: number, h: number, isVertical: boolean, settings: any) => {
     const lines = text.split('\n');
@@ -34,7 +34,7 @@ export const TextBox: React.FC<{
     onMerge: (src: number, target: number) => void;
     onDelete: (idx: number) => void;
 }> = ({ block, index, imgSrc, containerRect, onUpdate, onMerge, onDelete }) => {
-    const { settings, mergeAnchor, setMergeAnchor } = useOCR();
+    const { settings, mergeAnchor, setMergeAnchor, setDictPopup } = useOCR();
     const [isEditing, setIsEditing] = useState(false);
     const [fontSize, setFontSize] = useState(16);
     const ref = useRef<HTMLDivElement>(null);
@@ -57,84 +57,34 @@ export const TextBox: React.FC<{
         }
     }, [block, containerRect, settings, isEditing, isVertical]);
 
-    // --- HELPER: Find Scroll Container from Image ---
+    // --- HELPER: Find Scroll Container ---
     const findScrollContainerFromImage = (src: string): HTMLElement | null => {
         const img = document.querySelector(`img[src="${src}"]`);
         if (!img) return null;
-
         let parent = img.parentElement;
         while (parent && parent !== document.body) {
             const style = window.getComputedStyle(parent);
-            
             const canScrollY = (style.overflowY === 'auto' || style.overflowY === 'scroll') && parent.scrollHeight > parent.clientHeight;
             const canScrollX = (style.overflowX === 'auto' || style.overflowX === 'scroll') && parent.scrollWidth > parent.clientWidth;
-
-            if (canScrollY || canScrollX) {
-                return parent;
-            }
+            if (canScrollY || canScrollX) return parent;
             parent = parent.parentElement;
         }
         return null;
     };
 
-    // --- UPDATED: Handle Wheel Events ---
     const handleWheel = (e: React.WheelEvent) => {
         if (isEditing) return;
-
-        // Helper to apply logic to a found element
-        const attemptScroll = (el: HTMLElement) => {
-            const style = window.getComputedStyle(el);
-            const canScrollY = (style.overflowY === 'auto' || style.overflowY === 'scroll') && el.scrollHeight > el.clientHeight;
-            const canScrollX = (style.overflowX === 'auto' || style.overflowX === 'scroll') && el.scrollWidth > el.clientWidth;
-
-            // PRIORITY 1: Strictly Horizontal
-            if (canScrollX && !canScrollY) {
-                el.scrollLeft += e.deltaY;
-                return true;
-            }
-
-            // PRIORITY 2: Both directions available (e.g. Zoomed in or Continuous Horizontal with tall images)
-            // Heuristic: If the scrollable width is significantly larger than scrollable height, 
-            // it is likely a horizontal strip (Continuous Horizontal Mode).
-            if (canScrollX && canScrollY) {
-                if (el.scrollWidth > el.scrollHeight) {
-                    el.scrollLeft += e.deltaY;
-                    return true;
-                }
-            }
-            
-            // PRIORITY 3: Default Vertical
-            if (canScrollY) {
-                el.scrollTop += e.deltaY;
-                return true;
-            }
-            
-            return false;
-        };
-
-        // 1. Try to find the container based on the source image (Highest Accuracy)
         const containerFromImg = findScrollContainerFromImage(imgSrc);
         if (containerFromImg) {
-            attemptScroll(containerFromImg);
-            return;
-        }
-
-        // 2. Fallback: Bubbling search from cursor position
-        if (ref.current) {
-            ref.current.style.pointerEvents = 'none';
-            const elementUnder = document.elementFromPoint(e.clientX, e.clientY);
-            ref.current.style.pointerEvents = '';
-
-            let target = elementUnder;
-            while (target && target !== document.body && target !== document.documentElement) {
-                const el = target as HTMLElement;
-                if (attemptScroll(el)) return;
-                target = target.parentElement;
+            if (containerFromImg.scrollWidth > containerFromImg.clientWidth) {
+                containerFromImg.scrollLeft += e.deltaY;
+            } else {
+                containerFromImg.scrollTop += e.deltaY;
             }
         }
     };
 
-    const handleInteract = (e: React.MouseEvent) => {
+    const handleInteract = async (e: React.MouseEvent) => {
         const selection = window.getSelection();
         if (selection && !selection.isCollapsed) return;
 
@@ -154,6 +104,88 @@ export const TextBox: React.FC<{
                 if (mergeAnchor.imgSrc === imgSrc && mergeAnchor.index !== index) onMerge(mergeAnchor.index, index);
                 setMergeAnchor(null);
             }
+        } else {
+            if (!settings.enableYomitan) return;
+
+            // 1. Get Initial Char Offset (Browser Logic)
+            let charOffset = 0;
+            let range: Range | null = null;
+
+            // Try standard API
+            if (document.caretRangeFromPoint) {
+                range = document.caretRangeFromPoint(e.clientX, e.clientY);
+                if (range) charOffset = range.startOffset;
+            } else if ((document as any).caretPositionFromPoint) {
+                const pos = (document as any).caretPositionFromPoint(e.clientX, e.clientY);
+                if (pos) charOffset = pos.offset;
+            }
+
+            // 2. CORRECTION LOGIC: Fix "Bottom Half" Clicks
+            // If the browser says we are at index N, we check if the click was physically inside character N-1.
+            // If so, we assume the user meant character N-1.
+            if (range && range.startContainer.nodeType === Node.TEXT_NODE && charOffset > 0) {
+                try {
+                    const testRange = document.createRange();
+                    // Select character BEFORE the cursor
+                    testRange.setStart(range.startContainer, charOffset - 1);
+                    testRange.setEnd(range.startContainer, charOffset);
+                    
+                    const rects = testRange.getClientRects();
+                    // Check all rects (in case of wrapping, though unlikely for single char)
+                    for (let i = 0; i < rects.length; i++) {
+                        const rect = rects[i];
+                        // Check if click point is inside this character's box
+                        if (
+                            e.clientX >= rect.left && 
+                            e.clientX <= rect.right && 
+                            e.clientY >= rect.top && 
+                            e.clientY <= rect.bottom
+                        ) {
+                            // User clicked this character! Shift offset back to point at it.
+                            charOffset -= 1;
+                            break;
+                        }
+                    }
+                } catch (err) {
+                    // Fallback to default behavior if range manip fails
+                }
+            }
+
+            let content = cleanPunctuation(block.text);
+            content = content.replace(/\u200B/g, '\n');
+
+            // 3. Calculate Byte Offset for Rust
+            const encoder = new TextEncoder();
+            const prefix = content.substring(0, charOffset);
+            const byteIndex = encoder.encode(prefix).length;
+
+            setDictPopup({
+                visible: true,
+                x: e.clientX,
+                y: e.clientY,
+                results: [],
+                isLoading: true,
+                systemLoading: false
+            });
+
+            // 4. Send Corrected Index
+            const results = await lookupYomitan(content, byteIndex);
+
+            if (results === 'loading') {
+                 setDictPopup(prev => ({
+                    ...prev,
+                    results: [],
+                    isLoading: false,
+                    systemLoading: true
+                }));
+            } else {
+                setDictPopup(prev => ({
+                    ...prev,
+                    results: results,
+                    isLoading: false,
+                    systemLoading: false
+                }));
+            }
         }
     };
 
@@ -170,8 +202,8 @@ export const TextBox: React.FC<{
     };
 
     const isMergedTarget = mergeAnchor?.imgSrc === imgSrc && mergeAnchor?.index === index;
-    let content = isEditing ? block.text : cleanPunctuation(block.text);
-    content = content.replace(/\u200B/g, '\n');
+    let displayContent = isEditing ? block.text : cleanPunctuation(block.text);
+    displayContent = displayContent.replace(/\u200B/g, '\n');
 
     return (
         <div
@@ -187,7 +219,7 @@ export const TextBox: React.FC<{
             onBlur={() => {
                 setIsEditing(false);
                 const raw = ref.current?.innerText || '';
-                if (raw !== content) onUpdate(index, raw.replace(/\n/g, '\u200B'));
+                if (raw !== displayContent) onUpdate(index, raw.replace(/\n/g, '\u200B'));
             }}
             onClick={handleInteract}
             style={{
@@ -203,7 +235,7 @@ export const TextBox: React.FC<{
                 touchAction: 'pan-y', 
             }}
         >
-            {content}
+            {displayContent}
         </div>
     );
 };
