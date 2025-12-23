@@ -52,7 +52,7 @@ export const SettingsTrackerCard = ({ tracker }: { tracker: TTrackerSearch }) =>
         if (isOAuthLogin) {
             const state = {
                 redirectUrl: `${window.location.origin}/tracker/login/oauth`,
-                clientName: 'Suwayomi-WebUI',
+                clientName: 'Mangatan-WebUI',
                 trackerId: tracker.id,
                 trackerName: tracker.name,
             };

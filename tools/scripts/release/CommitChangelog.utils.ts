@@ -187,7 +187,7 @@ const getContributors = (commits: Commit[]): string[] => [
 
 export const createCommitChangelog = async (prevReleaseLastCommitSha: string): Promise<string> => {
     const owner = 'Suwayomi';
-    const repo = 'Suwayomi-WebUI';
+    const repo = 'Mangatan-WebUI';
 
     const { totalRepoCommitCount: numberOfCommits, commits: githubCommits } = await fetchCommits(
         owner,

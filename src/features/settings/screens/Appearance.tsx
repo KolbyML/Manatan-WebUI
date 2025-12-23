@@ -125,7 +125,7 @@ export const Appearance = () => {
                             <>
                                 <span>{t('settings.label.language_description')} </span>
                                 <Link
-                                    href="https://hosted.weblate.org/projects/suwayomi/suwayomi-webui"
+                                    href="https://hosted.weblate.org/projects/suwayomi/mangatan-webui"
                                     target="_blank"
                                     rel="noreferrer"
                                 >

@@ -227,7 +227,7 @@ export const MangaGrid: React.FC<IMangaGridProps> = ({
         [dimensions, mangaGridItemWidth, gridLayout],
     );
 
-    // always show vertical scrollbar to prevent https://github.com/Suwayomi/Suwayomi-WebUI/issues/758
+    // always show vertical scrollbar to prevent https://github.com/Suwayomi/Mangatan-WebUI/issues/758
     useLayoutEffect(() => {
         if (horizontal) {
             return () => {};

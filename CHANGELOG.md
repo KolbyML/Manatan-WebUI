@@ -45,7 +45,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - (**Reader**) Fix broken scrolling in continuous horizontal reading mode
 
 ### Translations
-Feel free to translate the project on [Weblate](https://hosted.weblate.org/projects/suwayomi/suwayomi-webui/)
+Feel free to translate the project on [Weblate](https://hosted.weblate.org/projects/suwayomi/mangatan-webui/)
 
 Thanks to everyone that contributed to the translation of this project.
 
@@ -92,7 +92,7 @@ Thanks to everyone that contributed to this release
 - (**Chapter**) Fix updating read status of already read chapters when using the mark previous as read option
 
 ### Translations
-Feel free to translate the project on [Weblate](https://hosted.weblate.org/projects/suwayomi/suwayomi-webui/)
+Feel free to translate the project on [Weblate](https://hosted.weblate.org/projects/suwayomi/mangatan-webui/)
 
 Thanks to everyone that contributed to the translation of this project.
 
@@ -177,7 +177,7 @@ Thanks to everyone that contributed to this release
 - (**Download**) Fix downloads start/stop button not updating
 
 ### Translations
-Feel free to translate the project on [Weblate](https://hosted.weblate.org/projects/suwayomi/suwayomi-webui/)
+Feel free to translate the project on [Weblate](https://hosted.weblate.org/projects/suwayomi/mangatan-webui/)
 
 Thanks to everyone that contributed to the translation of this project.
 
@@ -208,7 +208,7 @@ Thanks to everyone that contributed to this release
 - (**Server update**) Fix detection of available server update
 
 ### Translations
-Feel free to translate the project on [Weblate](https://hosted.weblate.org/projects/suwayomi/suwayomi-webui/)
+Feel free to translate the project on [Weblate](https://hosted.weblate.org/projects/suwayomi/mangatan-webui/)
 
 Thanks to everyone that contributed to the translation of this project.
 
@@ -373,7 +373,7 @@ Thanks to everyone that contributed to this release
 - (**Category**) Fix missing error message on category update/creation failure
 
 ### Translations
-Feel free to translate the project on [Weblate](https://hosted.weblate.org/projects/suwayomi/suwayomi-webui/)
+Feel free to translate the project on [Weblate](https://hosted.weblate.org/projects/suwayomi/mangatan-webui/)
 
 Thanks to everyone that contributed to the translation of this project.
 
@@ -520,7 +520,7 @@ Thanks to everyone that contributed to this release
 - (**Manga grid**) Fix jittering/flickering of manga grid items
 
 ### Translations
-Feel free to translate the project on [Weblate](https://hosted.weblate.org/projects/suwayomi/suwayomi-webui/)
+Feel free to translate the project on [Weblate](https://hosted.weblate.org/projects/suwayomi/mangatan-webui/)
 
 Thanks to everyone that contributed to the translation of this project.
 
@@ -552,7 +552,7 @@ Thanks to everyone that contributed to this release
 ## [1.0.0] (r1411) - 2024-02-23
 
 ### Added
-- (**General**) Added internationalization (help translating on [Weblate](https://hosted.weblate.org/projects/suwayomi/suwayomi-webui/))
+- (**General**) Added internationalization (help translating on [Weblate](https://hosted.weblate.org/projects/suwayomi/mangatan-webui/))
 - (**General**) Get notified when a new server version has been released
 - (**General**) Manually check for new versions (server and webUI)
 - (**Download**) Download ahead: automatically download next unread chapters while reading (requires the current and next chapters to be downloaded)
@@ -588,7 +588,7 @@ Thanks to everyone that contributed to this release
 - A lot (and added new ones for the future, lul)
 
 ### Translations
-Feel free to translate the project on [Weblate](https://hosted.weblate.org/projects/suwayomi/suwayomi-webui/).
+Feel free to translate the project on [Weblate](https://hosted.weblate.org/projects/suwayomi/mangatan-webui/).
 
 Thanks to everyone that contributed to the translation of this project.
 
@@ -612,11 +612,11 @@ Thanks to everyone that contributed to this release
 
 @schroda, @jesusFx, @QuietBlade, @anvstin, @guohuageng, @plum7x, @HiyoriTUK, @aizhimoran, @JiPaix, @Yuhyeong, @a18ccms, @chancez, @rickymcmuffin, @zmmx, @alexandrejournet, @ibaraki-douji, @nitezs, @misaka10843, @Becods, @skrewde, @xconkhi9x, @cnmorocho, @Wip-Sama, @Kefir2105, @RafieHardinur, @SuperMario229, @Alexandre-P-J, @AriaMoradi, @NathanBnm, @FumoVite, @JoHena, @bandysharif, @DevCoz, @comradekingu, @Zereef, @akabhirav
 
-[unreleased]: https://github.com/suwayomi/suwayomi-webui/compare/v20250801.01...HEAD
-[20250801.01]: https://github.com/suwayomi/suwayomi-webui/compare/v20250731.01...v20250801.01
-[20250731.01]: https://github.com/suwayomi/suwayomi-webui/compare/v20250703.01...v20250731.01
-[20250703.01]: https://github.com/suwayomi/suwayomi-webui/compare/v1.5.1...v20250703.01
-[1.5.1]: https://github.com/suwayomi/suwayomi-webui/compare/v1.5.0...v1.5.1
-[1.5.0]: https://github.com/suwayomi/suwayomi-webui/compare/v1.1.0...v1.5.0
-[1.1.0]: https://github.com/suwayomi/suwayomi-webui/compare/v1.0.0...v1.1.0
-[1.0.0]: https://github.com/suwayomi/suwayomi-webui/releases/tag/v1.0.0
+[unreleased]: https://github.com/suwayomi/mangatan-webui/compare/v20250801.01...HEAD
+[20250801.01]: https://github.com/suwayomi/mangatan-webui/compare/v20250731.01...v20250801.01
+[20250731.01]: https://github.com/suwayomi/mangatan-webui/compare/v20250703.01...v20250731.01
+[20250703.01]: https://github.com/suwayomi/mangatan-webui/compare/v1.5.1...v20250703.01
+[1.5.1]: https://github.com/suwayomi/mangatan-webui/compare/v1.5.0...v1.5.1
+[1.5.0]: https://github.com/suwayomi/mangatan-webui/compare/v1.1.0...v1.5.0
+[1.1.0]: https://github.com/suwayomi/mangatan-webui/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/suwayomi/mangatan-webui/releases/tag/v1.0.0
