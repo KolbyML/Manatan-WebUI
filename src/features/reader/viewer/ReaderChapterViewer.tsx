@@ -47,6 +47,9 @@ import { ChapterIdInfo } from '@/features/chapter/Chapter.types.ts';
 import { READER_DEFAULT_PAGES_STATE } from '@/features/reader/stores/ReaderPagesStore.ts';
 import { getReaderChaptersStore } from '@/features/reader/stores/ReaderStore.ts';
 
+// Import Context to respect "Mobile Mode" setting
+import { useOCR } from '@/Mangatan/context/OCRContext';
+
 const BaseReaderChapterViewer = ({
     currentPageIndex,
     setPages: setContextPages,
@@ -129,12 +132,24 @@ const BaseReaderChapterViewer = ({
     const { t } = useTranslation();
     const { direction: themeDirection } = useTheme();
 
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    // --- DETECT MOBILE MODE ---
+    const isUserAgentMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    let isSettingMobile = false;
+    try {
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        const { settings } = useOCR();
+        isSettingMobile = settings?.mobileMode || false;
+    } catch (e) { /* ignore */ }
+
+    // If TRUE, we wrap in Zoom Engine. If FALSE, we render standard layout (Raw Stack).
+    const isMobile = isUserAgentMobile || isSettingMobile;
 
     // --- ZOOM STATE ---
     const [scale, setScale] = useState(1);
     const zoomRef = useRef<ReactZoomPanPinchRef | null>(null);
+    const isScaleChanged = Math.abs(scale - 1) > 0.01;
 
+    // Interaction Handlers (Only active when Mobile Mode is ON)
     const onInteractionStart = () => {
         if (isMobile) document.body.classList.add('ocr-interaction');
     };
@@ -145,9 +160,7 @@ const BaseReaderChapterViewer = ({
         }
     };
 
-    const isScaleChanged = Math.abs(scale - 1) > 0.01;
-
-    // Manual Input Listener (from TextBox dragging)
+    // Manual Input Listener (TextBox dragging - Mobile Only)
     useEffect(() => {
         if (!isMobile) return;
         const handleManualMove = (e: Event) => {
@@ -358,8 +371,55 @@ const BaseReaderChapterViewer = ({
         );
     }
 
+    // --- RENDER CONTENT ---
     const PagerContent = (
-        <>
+        <Stack
+            ref={ref}
+            sx={{
+                width: isContinuousVerticalReadingMode(readingMode) ? '100%' : 'fit-content',
+                height: readingMode === ReadingMode.CONTINUOUS_HORIZONTAL ? '100%' : 'fit-content',
+                margin: 'auto',
+                flexWrap: 'nowrap',
+                ...applyStyles(readingMode === ReadingMode.CONTINUOUS_HORIZONTAL, {
+                    minHeight,
+                }),
+                ...applyStyles(isContinuousVerticalReadingMode(readingMode), {
+                    minWidth,
+                }),
+                ...applyStyles(shouldHideChapter, {
+                    maxWidth: 0,
+                    maxHeight: 0,
+                    minWidth: 'unset',
+                    minHeight: 'unset',
+                    overflow: 'hidden',
+                    margin: 'unset',
+                }),
+                ...applyStyles(
+                    isContinuousVerticalReadingMode(readingMode) && shouldApplyReaderWidth(readerWidth, pageScaleMode),
+                    { alignItems: 'center' },
+                ),
+                ...applyStyles(readingMode === ReadingMode.CONTINUOUS_HORIZONTAL, {
+                    ...applyStyles(themeDirection === 'ltr', {
+                        flexDirection: isLtrReadingDirection ? 'row' : 'row-reverse',
+                    }),
+                    ...applyStyles(themeDirection === 'rtl', {
+                        flexDirection: isLtrReadingDirection ? 'row-reverse' : 'row',
+                    }),
+                }),
+            }}
+        >
+            {!isPreloadMode && (
+                <ReaderInfiniteScrollUpdateChapter
+                    chapterId={chapterId}
+                    previousChapterId={previousChapterId}
+                    nextChapterId={nextChapterId}
+                    isCurrentChapter={isCurrentChapter}
+                    isPreviousChapterVisible={isPreviousChapterVisible}
+                    isNextChapterVisible={isNextChapterVisible}
+                    imageWrapper={pagerRef.current}
+                    scrollElement={scrollElement}
+                />
+            )}
             {showPreviousTransitionPage && (
                 <ReaderTransitionPage chapterId={chapterId} type={ReaderTransitionPageMode.PREVIOUS} />
             )}
@@ -393,129 +453,71 @@ const BaseReaderChapterViewer = ({
             {showNextTransitionPage && (
                 <ReaderTransitionPage chapterId={chapterId} type={ReaderTransitionPageMode.NEXT} />
             )}
-        </>
+        </Stack>
     );
 
-    // --- DETERMINE STYLES ---
+    // --- CONDITIONAL RENDERING ---
+    // If NOT Mobile Mode: Render pure content (Original Behavior)
+    if (!isMobile) {
+        return PagerContent;
+    }
+
+    // If Mobile Mode: Wrap in Zoom Engine
     const isVertical = isContinuousVerticalReadingMode(readingMode);
     const isHorizontalContinuous = readingMode === ReadingMode.CONTINUOUS_HORIZONTAL;
     
     const contentStyle = {
-        // Horizontal Continuous needs AUTO width so it can expand sideways
-        // Vertical needs 100% width so it fits screen width
         width: isVertical ? '100%' : (isHorizontalContinuous ? 'auto' : '100%'),
         height: isVertical ? 'auto' : '100%',
+        pointerEvents: 'auto' as const
     };
 
-    // Determine correct touch-action for native browser scrolling
     let nativeTouchAction = 'auto';
-    if (isVertical) nativeTouchAction = 'pan-y'; // Webtoon: Browser handles Y
-    else if (isHorizontalContinuous) nativeTouchAction = 'pan-x'; // Horizontal Strip: Browser handles X
-    else nativeTouchAction = 'pan-x pan-y'; // Single/Double: Browser handles everything
+    if (isVertical) nativeTouchAction = 'pan-y'; 
+    else if (isHorizontalContinuous) nativeTouchAction = 'pan-x'; 
+    else nativeTouchAction = 'pan-x pan-y'; 
 
     return (
-        <Stack
-            ref={ref}
-            sx={{
-                width: isVertical ? '100%' : 'fit-content',
-                height: isHorizontalContinuous ? '100%' : 'fit-content',
-                margin: 'auto',
-                flexWrap: 'nowrap',
-                ...applyStyles(isHorizontalContinuous, {
-                    minHeight,
-                }),
-                ...applyStyles(isVertical, {
-                    minWidth,
-                }),
-                ...applyStyles(shouldHideChapter, {
-                    maxWidth: 0,
-                    maxHeight: 0,
-                    minWidth: 'unset',
-                    minHeight: 'unset',
-                    overflow: 'hidden',
-                    margin: 'unset',
-                }),
-                ...applyStyles(
-                    isVertical && shouldApplyReaderWidth(readerWidth, pageScaleMode),
-                    { alignItems: 'center' },
-                ),
-                ...applyStyles(readingMode === ReadingMode.CONTINUOUS_HORIZONTAL, {
-                    ...applyStyles(themeDirection === 'ltr', {
-                        flexDirection: isLtrReadingDirection ? 'row' : 'row-reverse',
-                    }),
-                    ...applyStyles(themeDirection === 'rtl', {
-                        flexDirection: isLtrReadingDirection ? 'row-reverse' : 'row',
-                    }),
-                }),
+        <TransformWrapper
+            ref={zoomRef}
+            key={chapterId}
+            initialScale={1}
+            minScale={1}
+            maxScale={5}
+            limitToBounds={true} 
+            disablePadding={true} 
+            centerOnInit={false}
+            doubleClick={{ mode: 'toggle', step: 2, disabled: false, animationTime: 200 }}
+            disabled={!isCurrentChapter} 
+            panning={{ disabled: !isScaleChanged, velocityDisabled: false }}
+            pinch={{ disabled: false }}
+            wheel={{ disabled: true }}
+            onTransformed={(ref) => {
+                const newScale = ref.state.scale;
+                setScale(newScale);
+                if (newScale > 1.01) document.body.classList.add('disable-native-scroll');
+                else document.body.classList.remove('disable-native-scroll');
+                if (scrollElement) scrollElement.dispatchEvent(new Event('scroll'));
             }}
+            onZoomStart={onInteractionStart}
+            onPanningStart={onInteractionStart}
+            onZoomStop={onInteractionStop}
+            onPanningStop={onInteractionStop}
         >
-            {!isPreloadMode && (
-                <ReaderInfiniteScrollUpdateChapter
-                    chapterId={chapterId}
-                    previousChapterId={previousChapterId}
-                    nextChapterId={nextChapterId}
-                    isCurrentChapter={isCurrentChapter}
-                    isPreviousChapterVisible={isPreviousChapterVisible}
-                    isNextChapterVisible={isNextChapterVisible}
-                    imageWrapper={pagerRef.current}
-                    scrollElement={scrollElement}
-                />
-            )}
-            
-            <TransformWrapper
-                ref={zoomRef}
-                key={chapterId}
-                initialScale={1}
-                minScale={1}
-                maxScale={5}
-                limitToBounds={true} 
-                disablePadding={true} 
-                centerOnInit={true}
-                
-                doubleClick={{ mode: 'toggle', step: 2, disabled: false, animationTime: 0 }}
-
-                disabled={!isMobile || !isCurrentChapter} 
-                
-                panning={{ 
-                    disabled: !isScaleChanged, 
-                    velocityDisabled: false 
+            <TransformComponent
+                wrapperStyle={{ 
+                    width: '100%', 
+                    height: '100%', 
+                    overflow: 'visible', // Ensure overlays are visible even inside wrapper
+                    touchAction: isScaleChanged ? 'none' : nativeTouchAction,
+                    display: 'block', 
+                    pointerEvents: 'auto' as const
                 }}
-                
-                wheel={{ disabled: true }}
-
-                onTransformed={(ref) => {
-                    const newScale = ref.state.scale;
-                    setScale(newScale);
-                    
-                    if (newScale > 1.01) {
-                        document.body.classList.add('disable-native-scroll');
-                    } else {
-                        document.body.classList.remove('disable-native-scroll');
-                    }
-                    if (scrollElement) scrollElement.dispatchEvent(new Event('scroll'));
-                }}
-                
-                onZoomStart={onInteractionStart}
-                onPanningStart={onInteractionStart}
-                onZoomStop={onInteractionStop}
-                onPanningStop={onInteractionStop}
+                contentStyle={contentStyle}
             >
-                <TransformComponent
-                    wrapperStyle={{ 
-                        width: '100%', 
-                        height: '100%', 
-                        overflow: 'hidden',
-                        // CSS Magic: Block browser if zoomed, otherwise allow mode-specific scroll
-                        touchAction: isScaleChanged ? 'none' : nativeTouchAction,
-                        // REMOVED Flex centering to prevent top-clipping in long strips
-                        display: 'block' 
-                    }}
-                    contentStyle={contentStyle}
-                >
-                    {PagerContent}
-                </TransformComponent>
-            </TransformWrapper>
-        </Stack>
+                {PagerContent}
+            </TransformComponent>
+        </TransformWrapper>
     );
 };
 
