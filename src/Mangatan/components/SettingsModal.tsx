@@ -42,7 +42,7 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                     mobileMode: isMobile,
                     enableYomitan: isiOS
                 });
-                closeDialog(); // FIX: Explicitly close since we changed GlobalDialog behavior
+                closeDialog(); 
             }
         );
     };
@@ -127,8 +127,13 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
     };
 
     return (
-        <div className="ocr-modal-overlay">
-            <div className="ocr-modal">
+        // 1. ADD onClick={onClose} to the background overlay
+        <div className="ocr-modal-overlay" onClick={onClose}>
+            <div 
+                className="ocr-modal"
+                // 2. STOP propagation so clicks inside the modal don't close it
+                onClick={(e) => e.stopPropagation()}
+            >
                 <div className="ocr-modal-header">
                     <h2>Settings</h2>
                 </div>

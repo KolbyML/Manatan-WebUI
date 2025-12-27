@@ -5,14 +5,15 @@ import { SettingsModal } from './components/SettingsModal';
 import { ChapterListInjector } from './components/ChapterListInjector'; 
 import { YomitanPopup } from './components/YomitanPopup'; 
 import { useOCR } from './context/OCRContext';
-import { GlobalDialog } from './components/GlobalDialog'; // IMPORTED
+import { GlobalDialog } from './components/GlobalDialog';
 
 const PUCK_SIZE = 50; 
 const STORAGE_KEY = 'mangatan_ocr_puck_pos';
 
 export const OCRManager = () => {
     const images = useMangaObserver(); 
-    const { settings } = useOCR();
+    // 1. Get setDictPopup from context
+    const { settings, setDictPopup } = useOCR();
     const [showSettings, setShowSettings] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
 
@@ -103,6 +104,8 @@ export const OCRManager = () => {
             isDragging.current = false; 
             return;
         }
+        // 2. Close the dictionary popup
+        setDictPopup(prev => ({ ...prev, visible: false }));
         setShowSettings(true);
     };
 
@@ -113,7 +116,7 @@ export const OCRManager = () => {
     return (
         <>
             <ChapterListInjector />
-            <GlobalDialog /> {/* <-- ADDED THIS */}
+            <GlobalDialog />
             
             {images.map(img => (
                 <ImageOverlay key={`${img.src}-${refreshKey}`} img={img} />
