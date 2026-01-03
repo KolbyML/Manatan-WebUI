@@ -93,6 +93,40 @@ export const TextBox: React.FC<{
         }
     }, [isActive, isEditing, settings.mobileMode, index, onUpdate, displayContent]);
 
+    // --- ANKI INTEGRATION START ---
+    const handleAnkiUpdate = async (e: React.MouseEvent) => {
+        if (!settings.ankiConnectEnabled) return; 
+
+        e.preventDefault(); 
+
+        let content = cleanPunctuation(block.text, settings.addSpaceOnMerge).replace(/\u200B/g, '\n');
+
+        try {
+            const response = await fetch('/api/anki/update-last-card', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    image_path: imgSrc,
+                    sentence: content,
+                    // Pass the configured field names
+                    sentence_field: settings.ankiSentenceField || "Sentence",
+                    image_field: settings.ankiImageField || "Image"
+                })
+            });
+
+            if (response.ok) {
+                alert("✅ Added to Anki!"); // Replacing this with a nice Toast is better
+            } else {
+                const txt = await response.text();
+                alert(`❌ Error: ${txt}`);
+            }
+        } catch (err) {
+            console.error(err);
+            alert("❌ Failed to reach Mangatan Server");
+        }
+    };
+    // --- ANKI INTEGRATION END ---
+
     const handleInteract = async (e: React.MouseEvent) => {
         const selection = window.getSelection();
         if (selection && !selection.isCollapsed) return;
@@ -208,6 +242,12 @@ export const TextBox: React.FC<{
             contentEditable={isEditing}
             suppressContentEditableWarning
             onDoubleClick={() => setIsEditing(true)}
+            onContextMenu={(e) => {
+                // Check if user holds Shift (allow normal browser menu) or other logic if needed
+                if (!e.shiftKey) { 
+                    handleAnkiUpdate(e);
+                }
+            }}
             onBlur={() => {
                 if (settings.mobileMode) return;
                 setIsEditing(false);
