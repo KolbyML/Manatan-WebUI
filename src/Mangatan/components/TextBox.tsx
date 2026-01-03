@@ -37,7 +37,16 @@ export const TextBox: React.FC<{
     onMerge: (src: number, target: number) => void;
     onDelete: (idx: number) => void;
 }> = ({ block, index, imgSrc, containerRect, onUpdate, onMerge, onDelete }) => {
-    const { settings, mergeAnchor, setMergeAnchor, setDictPopup } = useOCR();
+    const { 
+        settings, 
+        mergeAnchor, 
+        setMergeAnchor, 
+        setDictPopup,
+        showConfirm,    // <--- Add this
+        showProgress,   // <--- Add this
+        showAlert,      // <--- Add this
+        closeDialog     // <--- Add this
+    } = useOCR();
     const [isEditing, setIsEditing] = useState(false);
     const [isActive, setIsActive] = useState(false); 
     const [fontSize, setFontSize] = useState(16);
@@ -93,39 +102,54 @@ export const TextBox: React.FC<{
         }
     }, [isActive, isEditing, settings.mobileMode, index, onUpdate, displayContent]);
 
-    // --- ANKI INTEGRATION START ---
-    const handleAnkiUpdate = async (e: React.MouseEvent) => {
-        if (!settings.ankiConnectEnabled) return; 
+    const handleAnkiRequest = (e: React.MouseEvent) => {
+        // Prevent default browser menu
+        e.preventDefault();
+        e.stopPropagation();
 
-        e.preventDefault(); 
+        // Prepare the text
+        let content = cleanPunctuation(block.text, settings.addSpaceOnMerge);
+        content = content.replace(/\u200B/g, '\n');
 
-        let content = cleanPunctuation(block.text, settings.addSpaceOnMerge).replace(/\u200B/g, '\n');
+        // 2. Trigger the Confirmation Dialog
+        showConfirm(
+            'Update Anki Card?', // Title
+            'This will overwrite the image and text of the last added card in Anki.', // Message
+            async () => {
+                try {
+                    // 3. Show Loading Spinner
+                    showProgress('Sending to Anki...');
 
-        try {
-            const response = await fetch('/api/anki/update-last-card', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    image_path: imgSrc,
-                    sentence: content,
-                    // Pass the configured field names
-                    sentence_field: settings.ankiSentenceField || "Sentence",
-                    image_field: settings.ankiImageField || "Image"
-                })
-            });
+                    const payload = {
+                        image_path: imgSrc,
+                        sentence: content,
+                        // Use settings or fallback to defaults
+                        sentence_field: settings.ankiSentenceField || "Sentence",
+                        image_field: settings.ankiImageField || "Image"
+                    };
 
-            if (response.ok) {
-                alert("✅ Added to Anki!"); // Replacing this with a nice Toast is better
-            } else {
-                const txt = await response.text();
-                alert(`❌ Error: ${txt}`);
+                    const response = await fetch('/api/anki/update-last-card', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    // 4. Handle Result
+                    if (response.ok) {
+                        closeDialog(); // Remove Spinner
+                        showAlert('Success', 'Anki card updated successfully!');
+                    } else {
+                        const errText = await response.text();
+                        closeDialog();
+                        showAlert('Anki Error', errText || 'Failed to update card.');
+                    }
+                } catch (err) {
+                    closeDialog();
+                    showAlert('Network Error', 'Could not reach Mangatan server.');
+                }
             }
-        } catch (err) {
-            console.error(err);
-            alert("❌ Failed to reach Mangatan Server");
-        }
+        );
     };
-    // --- ANKI INTEGRATION END ---
 
     const handleInteract = async (e: React.MouseEvent) => {
         const selection = window.getSelection();
@@ -243,9 +267,9 @@ export const TextBox: React.FC<{
             suppressContentEditableWarning
             onDoubleClick={() => setIsEditing(true)}
             onContextMenu={(e) => {
-                // Check if user holds Shift (allow normal browser menu) or other logic if needed
+                // Check if user holds Shift or other logic if needed
                 if (!e.shiftKey) { 
-                    handleAnkiUpdate(e);
+                    handleAnkiRequest(e);
                 }
             }}
             onBlur={() => {
