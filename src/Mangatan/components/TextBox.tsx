@@ -37,11 +37,18 @@ export const TextBox: React.FC<{
     onMerge: (src: number, target: number) => void;
     onDelete: (idx: number) => void;
 }> = ({ block, index, imgSrc, containerRect, onUpdate, onMerge, onDelete }) => {
-    const { settings, mergeAnchor, setMergeAnchor, setDictPopup, dictPopup } = useOCR();
+    const { settings, mergeAnchor, setMergeAnchor, setDictPopup, dictPopup, wasPopupClosedRecently } = useOCR();
     const [isEditing, setIsEditing] = useState(false);
     const [isActive, setIsActive] = useState(false); 
     const [fontSize, setFontSize] = useState(16);
     const ref = useRef<HTMLDivElement>(null);
+
+    // FIX: Track if we just activated the box to prevent "1-click" lookup on Android
+    const justActivated = useRef(false);
+
+    // Track popup state via ref to access inside event listeners safely
+    const dictPopupRef = useRef(dictPopup.visible);
+    useEffect(() => { dictPopupRef.current = dictPopup.visible; }, [dictPopup.visible]);
 
     const isVertical =
         block.forcedOrientation === 'vertical' ||
@@ -68,25 +75,28 @@ export const TextBox: React.FC<{
     let displayContent = isEditing ? block.text : cleanPunctuation(block.text, settings.addSpaceOnMerge);
     displayContent = displayContent.replace(/\u200B/g, '\n');
 
-    // --- NEW: NATIVE SELECTION HANDLER ---
-    // Instead of rendering a span, we use the browser's native selection API
-    // to highlight the text. This prevents ALL layout shifts.
+    // --- NATIVE SELECTION HANDLER ---
     useLayoutEffect(() => {
-        // Only run if the popup is visible and the highlight belongs to this block
-        const highlight = dictPopup.visible ? dictPopup.highlight : undefined;
-        
-        // Clear selection if popup closes or highlight moves elsewhere
+        const selection = window.getSelection();
+        if (!selection) return;
+
+        // Explicitly clear selection when popup closes to remove the highlight pins/color
+        if (!dictPopup.visible) {
+            // Only clear selection if WE are the active box
+            if (isActive) selection.removeAllRanges();
+            return;
+        }
+
+        const highlight = dictPopup.highlight;
         if (!highlight || highlight.imgSrc !== imgSrc || highlight.index !== index) {
             return;
         }
 
-        const selection = window.getSelection();
         const node = ref.current?.firstChild;
 
-        if (selection && node && node.nodeType === Node.TEXT_NODE) {
+        if (node && node.nodeType === Node.TEXT_NODE) {
             try {
                 const range = document.createRange();
-                // Ensure we don't go out of bounds
                 const start = Math.max(0, Math.min(highlight.startChar, node.textContent?.length || 0));
                 const end = Math.max(0, Math.min(start + highlight.length, node.textContent?.length || 0));
                 
@@ -96,26 +106,38 @@ export const TextBox: React.FC<{
                 selection.removeAllRanges();
                 selection.addRange(range);
             } catch (e) {
-                // Silently fail if ranges are invalid (e.g. text changed rapidly)
+                // Silently fail
             }
         }
-    }, [dictPopup.visible, dictPopup.highlight, imgSrc, index, displayContent]);
+    }, [dictPopup.visible, dictPopup.highlight, imgSrc, index, displayContent, isActive]);
 
+    // --- GLOBAL CLICK LISTENER ---
     useEffect(() => {
         if (!isActive || !settings.mobileMode) return;
+        
         const handleGlobalClick = (e: MouseEvent | TouchEvent) => {
-            if (ref.current && !ref.current.contains(e.target as Node)) {
+            const target = e.target as Element;
+
+            // If popup is open or was just closed, ignore this click to prevent closing the text box
+            if (dictPopupRef.current || wasPopupClosedRecently()) return;
+
+            if (target && (target.closest('.yomitan-popup') || target.closest('.yomitan-backdrop'))) {
+                return; 
+            }
+
+            if (ref.current && !ref.current.contains(target as Node)) {
                 setIsActive(false);
                 setIsEditing(false);
             }
         };
+
         document.addEventListener('touchstart', handleGlobalClick);
         document.addEventListener('mousedown', handleGlobalClick);
         return () => {
             document.removeEventListener('touchstart', handleGlobalClick);
             document.removeEventListener('mousedown', handleGlobalClick);
         };
-    }, [isActive, settings.mobileMode]);
+    }, [isActive, settings.mobileMode, wasPopupClosedRecently]);
 
     useEffect(() => {
         if (!isActive && !isEditing && settings.mobileMode) {
@@ -126,9 +148,23 @@ export const TextBox: React.FC<{
         }
     }, [isActive, isEditing, settings.mobileMode, index, onUpdate, displayContent]);
 
+    // FIX: HANDLE FIRST TAP (ACTIVATION)
+    const handleTouchStart = (e: React.TouchEvent) => {
+        if (!settings.mobileMode) return;
+        
+        if (!isActive) {
+            setIsActive(true);
+            
+            // Set flag to block the subsequent click event from triggering lookup
+            justActivated.current = true;
+            setTimeout(() => justActivated.current = false, 500);
+
+            if (e.cancelable) e.preventDefault();
+        }
+    };
+
     const handleInteract = async (e: React.MouseEvent) => {
         const selection = window.getSelection();
-        // Allow user to manually select text if they are dragging
         if (selection && !selection.isCollapsed && !dictPopup.visible) return;
 
         if (isEditing) return;
@@ -149,10 +185,11 @@ export const TextBox: React.FC<{
                 setMergeAnchor(null);
             }
         } else {
-            if (settings.mobileMode && !isActive) {
-                e.preventDefault(); 
-                setIsActive(true);
-                if (ref.current) ref.current.focus();
+            // FIX: ANDROID 2-CLICK GUARD
+            // If we just activated this box (via touchStart), OR if isActive is somehow false,
+            // STOP here. Do not lookup.
+            if (settings.mobileMode && (justActivated.current || !isActive)) {
+                if (!isActive) setIsActive(true);
                 return;
             }
 
@@ -162,7 +199,6 @@ export const TextBox: React.FC<{
             let charOffset = 0;
             let range: Range | null = null;
             
-            // Use Caret Position to find exactly where the user clicked
             if (document.caretRangeFromPoint) {
                 range = document.caretRangeFromPoint(e.clientX, e.clientY);
                 if (range) charOffset = range.startOffset;
@@ -171,7 +207,6 @@ export const TextBox: React.FC<{
                 if (pos) charOffset = pos.offset;
             }
 
-            // Adjust offset for rect-based precision if available
             if (range && range.startContainer.nodeType === Node.TEXT_NODE && charOffset > 0) {
                 try {
                     const testRange = document.createRange();
@@ -217,7 +252,6 @@ export const TextBox: React.FC<{
                     results: results, 
                     isLoading: false, 
                     systemLoading: false,
-                    // The useEffect above will detect this change and apply the Native Selection
                     highlight: {
                         imgSrc,
                         index,
@@ -243,19 +277,25 @@ export const TextBox: React.FC<{
 
     const isMergedTarget = mergeAnchor?.imgSrc === imgSrc && mergeAnchor?.index === index;
 
+    // Check if this box is the one currently being looked up
+    const isLookingUp = dictPopup.visible && 
+                        dictPopup.highlight?.imgSrc === imgSrc && 
+                        dictPopup.highlight?.index === index;
+
     const classes = [
         'gemini-ocr-text-box',
         isVertical ? 'vertical' : '',
         isEditing ? 'editing' : '',
         isMergedTarget ? 'merge-target' : '',
-        isActive ? 'mobile-active' : ''
+        isActive ? 'mobile-active' : '',
+        isLookingUp ? 'active-lookup' : '' // FIX: Added class to force visibility
     ].filter(Boolean).join(' ');
 
     return (
         <div
             ref={ref}
             role="button"
-            tabIndex={0}
+            tabIndex={settings.mobileMode ? -1 : 0}
             onKeyDown={handleKeyDown}
             className={classes}
             contentEditable={isEditing}
@@ -269,6 +309,7 @@ export const TextBox: React.FC<{
                 if (raw !== displayContent) onUpdate(index, raw.replace(/\n/g, '\u200B'));
             }}
             onClick={handleInteract}
+            onTouchStart={handleTouchStart}
             style={{
                 left: `calc(${block.tightBoundingBox.x * 100}% - ${adj / 2}px)`,
                 top: `calc(${block.tightBoundingBox.y * 100}% - ${adj / 2}px)`,
@@ -287,11 +328,7 @@ export const TextBox: React.FC<{
                 lineHeight: isVertical ? '1.5' : '1.1',
             }}
         >
-            {/* CRITICAL FIX: 
-               Always render plain content. No more <span> insertion for highlighting.
-               This prevents the "Flexbox layout shift" completely.
-            */}
             {displayContent}
         </div>
     );
-};
+    };

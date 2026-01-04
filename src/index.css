@@ -2,7 +2,7 @@
  * Copyright (C) Contributors to the Suwayomi project
  */
 
-body {
+ body {
     margin: 0;
 }
 
@@ -74,6 +74,20 @@ html.ocr-reader-mode body {
     min-height: 20px;
 }
 
+/* FIX: iOS requires cursor: pointer to treat a div as a 'clickable' element instantly. */
+.mobile-mode .gemini-ocr-text-box {
+    cursor: pointer !important;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* FIX: Re-enable text selection only when the box is active (Blue) */
+.gemini-ocr-text-box.mobile-active {
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    cursor: text !important;
+}
+
 /* FIX: Vertical Mode Adjustment */
 .gemini-ocr-text-box.vertical {
     writing-mode: vertical-rl;
@@ -88,30 +102,24 @@ html.ocr-reader-mode body {
 }
 
 /* FIX: HOVER STATE (STABLE) */
-.gemini-ocr-text-box:hover {
-    z-index: 100000;
-
-    /* CRITICAL FIX: REMOVED SCALING.
-       Scaling changes the screen coordinates of the text. 
-       This was causing the "wrong word selected" bug on the second click. */
-    transform: none !important;
-    
-    /* Use outline for visual feedback instead of scaling or border changes */
-    outline: 2px solid var(--ocr-accent);
-    
-    /* Keep border/padding identical to non-hover state to prevent pixel shifts */
-    border: 1px solid #ccc; 
-    padding: 4px;           
-    
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    opacity: 1 !important; 
+/* Wrapped in hover media query to prevent sticky hover states on mobile */
+@media (hover: hover) {
+    .gemini-ocr-text-box:hover {
+        z-index: 100000;
+        transform: none !important;
+        outline: 2px solid var(--ocr-accent);
+        border: 1px solid #ccc; 
+        padding: 4px;           
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        opacity: 1 !important; 
+    }
 }
 
 /* FIX: CUSTOM SELECTION COLOR
    This styles the native browser highlight (window.getSelection) 
    to match your app's theme. */
 .gemini-ocr-text-box::selection {
-    background: rgba(72, 144, 255, 0.4); /* Matches --ocr-accent with opacity */
+    background: rgba(72, 144, 255, 0.4); 
     color: inherit;
 }
 
@@ -129,15 +137,28 @@ html.ocr-reader-mode body {
     text-align: left;
     
     opacity: 1 !important; 
+    user-select: text !important;
 }
 
 .gemini-ocr-text-box.editing::-webkit-scrollbar { display: none; }
 .gemini-ocr-text-box.merge-target { outline: 3px solid #f1c40f; z-index: 100000; opacity: 1 !important; }
 
+/* SOLO MODE LOGIC */
 .ocr-overlay-container.solo-mode .gemini-ocr-text-box { opacity: 0; }
 .ocr-overlay-container.solo-mode .gemini-ocr-text-box:hover { opacity: 1 !important; }
 
-/* REMOVED: .yomitan-highlight class is no longer needed */
+/* CRITICAL FIX: PREVENT FLASHING ON MOBILE
+   When in solo-mode, if a box is ACTIVE (Blue), force it to stay visible (Opacity 1). */
+.ocr-overlay-container.solo-mode .gemini-ocr-text-box.mobile-active {
+    opacity: 1 !important;
+}
+
+/* NEW FIX: PREVENT FLASHING ON DESKTOP
+   If the dictionary is open and this box is the active target, force visibility.
+   This fixes the issue where the backdrop covers the box, removing the hover state. */
+.ocr-overlay-container.solo-mode .gemini-ocr-text-box.active-lookup {
+    opacity: 1 !important;
+}
 
 /* --- SETTINGS MODAL STYLES --- */
 .ocr-modal-overlay { 

@@ -192,7 +192,7 @@ export const ImageOverlay: React.FC<{ img: HTMLImageElement }> = ({ img }) => {
     const isImgDisplayed = img.offsetParent !== null; 
     const isImgInViewport = rect.top < window.innerHeight && rect.bottom > 0; 
 
-    // MODIFIED: Hide overlay if the Reader Menu is open
+    // Hide overlay if the Reader Menu is open
     const shouldShowOverlay = (data || currentStatus === 'loading' || currentStatus === 'error')
         && isImgDisplayed
         && isImgInViewport
@@ -216,10 +216,13 @@ export const ImageOverlay: React.FC<{ img: HTMLImageElement }> = ({ img }) => {
         }, 400);
     };
 
+    // FIX: RESTORED SOLO MODE FOR MOBILE
+    // Removed the "&& !settings.mobileMode" check so 'solo-mode' class is applied if enabled.
+    // Also added onTouchStart to the container to ensure overlay becomes visible immediately on touch.
     const containerClasses = [
         'ocr-overlay-container',
         isVisible ? 'visible' : '',
-        settings.soloHoverMode ? 'solo-mode' : '',
+        settings.soloHoverMode ? 'solo-mode' : '', 
     ].filter(Boolean).join(' ');
 
     return createPortal(
@@ -238,6 +241,7 @@ export const ImageOverlay: React.FC<{ img: HTMLImageElement }> = ({ img }) => {
             }}
             onMouseEnter={onOverlayEnter}
             onMouseLeave={onOverlayLeave}
+            onTouchStart={onOverlayEnter} // FIX: Reveal overlay instantly on touch
         >
             <StatusIcon status={currentStatus} onRetry={fetchOCR} />
             {settings.enableOverlay && (isVisible || settings.interactionMode === 'click' || settings.mobileMode || settings.debugMode || dictPopup.visible) &&

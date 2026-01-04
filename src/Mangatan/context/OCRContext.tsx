@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback, useRef } from 'react';
 import { Settings, DEFAULT_SETTINGS, MergeState, OcrBlock, COLOR_THEMES, ServerSettingsData, DictPopupState, OcrStatus, DialogState } from '@/Mangatan/types';
 import { requestManager } from '@/lib/requests/RequestManager';
 
@@ -18,6 +18,10 @@ interface OCRContextType {
     // Dictionary State
     dictPopup: DictPopupState;
     setDictPopup: React.Dispatch<React.SetStateAction<DictPopupState>>;
+
+    // Popup Interaction Helpers
+    notifyPopupClosed: () => void;
+    wasPopupClosedRecently: () => boolean;
 
     // Global Dialog State
     dialogState: DialogState;
@@ -60,6 +64,18 @@ export const OCRProvider = ({ children }: { children: ReactNode }) => {
         visible: false, x: 0, y: 0, results: [], isLoading: false, systemLoading: false
     });
 
+    // --- POPUP COORDINATION ---
+    const lastPopupCloseRef = useRef<number>(0);
+
+    const notifyPopupClosed = useCallback(() => {
+        lastPopupCloseRef.current = Date.now();
+    }, []);
+
+    const wasPopupClosedRecently = useCallback(() => {
+        // Increased grace period to 1000ms to catch laggy ghost clicks
+        return Date.now() - lastPopupCloseRef.current < 1000;
+    }, []);
+
     const [dialogState, setDialogState] = useState<DialogState>({
         isOpen: false, type: 'alert', message: ''
     });
@@ -85,10 +101,8 @@ export const OCRProvider = ({ children }: { children: ReactNode }) => {
         setDialogState(prev => ({ 
             ...prev, 
             isOpen: true, 
-            // Resets ensure we don't inherit callbacks or button text from previous dialogs
             onConfirm: undefined, 
             onCancel: undefined,
-            // Cast to any to clear properties that might not be in the strict type yet
             ...({ confirmText: undefined, cancelText: undefined } as any),
             ...config 
         }));
@@ -103,7 +117,6 @@ export const OCRProvider = ({ children }: { children: ReactNode }) => {
     }, [showDialog]);
 
     const showAlert = useCallback((title: string, message: React.ReactNode) => {
-        // Since confirmText is reset by showDialog, this will default to "OK" in GlobalDialog
         showDialog({ type: 'alert', title, message });
     }, [showDialog]);
 
@@ -136,14 +149,14 @@ export const OCRProvider = ({ children }: { children: ReactNode }) => {
             settings, setSettings, serverSettings,
             ocrCache, updateOcrData, ocrStatusMap, setOcrStatus,
             mergeAnchor, setMergeAnchor, activeImageSrc, setActiveImageSrc,
-            dictPopup, setDictPopup,
+            dictPopup, setDictPopup, notifyPopupClosed, wasPopupClosedRecently,
             debugLog, addLog,
-            // Dialog exports
             dialogState, showDialog, closeDialog, showConfirm, showAlert, showProgress
         }),
         [
             settings, serverSettings, ocrCache, updateOcrData, ocrStatusMap, setOcrStatus, 
-            mergeAnchor, activeImageSrc, dictPopup, debugLog, addLog,
+            mergeAnchor, activeImageSrc, dictPopup, notifyPopupClosed, wasPopupClosedRecently,
+            debugLog, addLog,
             dialogState, showDialog, closeDialog, showConfirm, showAlert, showProgress
         ],
     );
