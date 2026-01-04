@@ -269,7 +269,7 @@ export const TextBox: React.FC<{
             onDoubleClick={() => setIsEditing(true)}
             onContextMenu={(e) => {
                 // Check if user holds Shift or other logic if needed
-                if (!e.shiftKey) { 
+                if (settings.ankiConnectEnabled && !e.shiftKey) { 
                     handleAnkiRequest(e);
                 }
             }}

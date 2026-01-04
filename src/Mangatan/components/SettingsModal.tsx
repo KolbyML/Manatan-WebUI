@@ -268,7 +268,10 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                     <h3>Anki Integrations</h3>
                     <label style={checkboxLabelStyle}>
                         <input type="checkbox" checked={localSettings.ankiConnectEnabled ?? false} onChange={(e) => handleChange('ankiConnectEnabled', e.target.checked)} style={checkboxInputStyle} />
-                        Enable Anki Integrations
+                        <div>
+                            Enable Anki Integrations
+                            <div style={{ opacity: 0.5, fontSize: '0.9em' }}>Right click on text box to trigger</div>
+                        </div>
                     </label>
                     <div className="grid">
                         <label htmlFor="ankiSent" style={{ opacity: localSettings.ankiConnectEnabled ? 1 : 0.5 }}>
