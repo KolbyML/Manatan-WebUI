@@ -131,8 +131,8 @@ export const DEFAULT_SETTINGS: Settings = {
         contentRootSelector: '#root',
     },
     ankiConnectEnabled: false,
-    ankiSentenceField: 'Sentence', // Common default
-    ankiImageField: 'Image',       // Common default, sometimes called 'Picture' or 'Back'
+    ankiSentenceField: '',
+    ankiImageField: '',
 };
 
 export const COLOR_THEMES: Record<ColorTheme, { accent: string; background: string }> = {

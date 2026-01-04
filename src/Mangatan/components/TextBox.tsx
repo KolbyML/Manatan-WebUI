@@ -179,11 +179,17 @@ export const TextBox: React.FC<{
                     // 3. Show Loading Spinner
                     showProgress('Sending to Anki...');
 
+                    // Prepare credentials if they exist
+                    const user = serverSettings?.authUsername?.trim();
+                    const pass = serverSettings?.authPassword?.trim();
+
                     const payload = {
                         image_path: cleanPath,
                         sentence: content,
                         sentence_field: settings.ankiSentenceField,
-                        image_field: settings.ankiImageField
+                        image_field: settings.ankiImageField,
+                        suwayomi_user: user || null,
+                        suwayomi_pass: pass || null
                     };
 
                     const response = await fetch('/api/anki/update-last-card', {
