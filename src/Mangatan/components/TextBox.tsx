@@ -111,6 +111,8 @@ export const TextBox: React.FC<{
         let content = cleanPunctuation(block.text, settings.addSpaceOnMerge);
         content = content.replace(/\u200B/g, '\n');
 
+        const cleanPath = imgSrc.replace(/^https?:\/\/[^\/]+/, '');
+
         // 2. Trigger the Confirmation Dialog
         showConfirm(
             'Update Anki Card?', // Title
@@ -121,7 +123,7 @@ export const TextBox: React.FC<{
                     showProgress('Sending to Anki...');
 
                     const payload = {
-                        image_path: imgSrc,
+                        image_path: cleanPath,
                         sentence: content,
                         // Use settings or fallback to defaults
                         sentence_field: settings.ankiSentenceField || "Sentence",
