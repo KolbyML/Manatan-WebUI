@@ -125,9 +125,8 @@ export const TextBox: React.FC<{
                     const payload = {
                         image_path: cleanPath,
                         sentence: content,
-                        // Use settings or fallback to defaults
-                        sentence_field: settings.ankiSentenceField || "Sentence",
-                        image_field: settings.ankiImageField || "Image"
+                        sentence_field: settings.ankiSentenceField,
+                        image_field: settings.ankiImageField
                     };
 
                     const response = await fetch('/api/anki/update-last-card', {
