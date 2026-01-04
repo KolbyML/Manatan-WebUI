@@ -47,7 +47,8 @@ export const TextBox: React.FC<{
         showConfirm,
         showProgress,
         showAlert,
-        closeDialog
+        closeDialog,
+        serverSettings
     } = useOCR();
     const [isEditing, setIsEditing] = useState(false);
     const [isActive, setIsActive] = useState(false); 
