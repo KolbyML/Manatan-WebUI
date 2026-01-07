@@ -4,6 +4,7 @@ import { useOCR } from '@/Mangatan/context/OCRContext';
 import { cleanPunctuation, lookupYomitan } from '@/Mangatan/utils/api';
 import { createCard, updateLastCard, imageUrlToBase64Webp } from '@/Mangatan/utils/anki';
 import { CropperModal } from '@/Mangatan/components/CropperModal';
+import { createPortal } from 'react-dom';
 
 const calculateFontSize = (text: string, w: number, h: number, isVertical: boolean, settings: any) => {
     const lines = text.split('\n');
@@ -489,13 +490,14 @@ export const TextBox: React.FC<{
                 {displayContent}
             </div>
 
-            {showCropper && (
+            {showCropper && createPortal(
                 <CropperModal
                     imageSrc={imgSrc}
                     onComplete={handleCropperComplete}
                     onCancel={() => setShowCropper(false)}
                     quality={settings.ankiImageQuality || 0.92}
-                />
+                />,
+                document.body
             )}
         </>
     );
