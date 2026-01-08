@@ -47,7 +47,8 @@ export const DictionaryManager: React.FC<{ onImportClick: () => void }> = ({ onI
     };
 
     return (
-        <div style={{ padding: '10px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px', marginBottom: '15px' }}>
+        // IMPROVED: Lighter background for the container to separate from the dark modal
+        <div style={{ padding: '10px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '6px', marginBottom: '15px', border: '1px solid rgba(255,255,255,0.1)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                 <h4 style={{ margin: 0 }}>Installed Dictionaries</h4>
                 <button type="button" onClick={onImportClick} style={{ padding: '4px 8px', fontSize: '12px' }}>
@@ -65,13 +66,17 @@ export const DictionaryManager: React.FC<{ onImportClick: () => void }> = ({ onI
                 {dicts.map((d, i) => (
                     <div key={d.id} style={{ 
                         display: 'flex', alignItems: 'center', gap: '8px', 
-                        background: '#333', padding: '6px', marginBottom: '4px', borderRadius: '4px' 
+                        // IMPROVED: Distinct row background and border
+                        background: 'rgba(0, 0, 0, 0.2)', 
+                        border: '1px solid rgba(255,255,255,0.05)',
+                        padding: '6px', marginBottom: '4px', borderRadius: '4px' 
                     }}>
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
                             <button type="button" disabled={i === 0} onClick={() => handleMove(i, 'up')} style={{ fontSize: '8px', padding: '0 4px', lineHeight: '1', height: '12px' }}>▲</button>
                             <button type="button" disabled={i === dicts.length - 1} onClick={() => handleMove(i, 'down')} style={{ fontSize: '8px', padding: '0 4px', lineHeight: '1', height: '12px' }}>▼</button>
                         </div>
-                        <div style={{ flexGrow: 1, fontSize: '13px', color: d.enabled ? '#fff' : '#777' }}>{d.name}</div>
+                        {/* IMPROVED: High contrast text colors */}
+                        <div style={{ flexGrow: 1, fontSize: '13px', color: d.enabled ? '#fff' : '#999' }}>{d.name}</div>
                         <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
                             <input type="checkbox" checked={d.enabled} onChange={() => handleToggle(d.id, d.enabled)} />
                         </label>

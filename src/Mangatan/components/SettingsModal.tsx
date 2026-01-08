@@ -12,11 +12,23 @@ const checkboxInputStyle: React.CSSProperties = {
     width: 'auto', marginRight: '10px', flexShrink: 0, cursor: 'pointer',
 };
 
+const sectionBoxStyle: React.CSSProperties = {
+    backgroundColor: 'rgba(0, 0, 0, 0.2)', 
+    padding: '15px',
+    borderRadius: '8px',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    marginBottom: '20px'
+};
+
 export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const { settings, setSettings, showConfirm, showAlert, showProgress, closeDialog, showDialog } = useOCR();
     const [localSettings, setLocalSettings] = useState(settings);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [dictManagerKey, setDictManagerKey] = useState(0);
+
+    // --- DICT INSTALL STATE ---
+    const [isInstalling, setIsInstalling] = useState(false);
+    const [installMessage, setInstallMessage] = useState('');
 
     // --- UPDATE STATE ---
     const [appVersion, setAppVersion] = useState<string>('...');
@@ -36,18 +48,14 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                     setAppVersion(`${info.version} (${info.variant})`);
                 }
 
-                // 1. Prioritize System Status
                 if (info.update_status && info.update_status !== 'idle') {
                     setUpdateStatus(info.update_status);
                 } 
-                // 2. Only if system is idle, check GitHub
                 else if (info.variant !== 'unknown' && info.variant !== 'desktop' && info.variant !== 'ios') {
                     if (!updateAvailable) {
                         const update = await checkForUpdates(info.version, info.variant);
                         if (isMounted && update.hasUpdate) setUpdateAvailable(update);
                     }
-                    // Only set to idle if we aren't currently downloading locally
-                    // This prevents flickering if the poll is slightly faster than the backend state update
                     if (updateStatus !== 'downloading' && updateStatus !== 'ready') {
                         setUpdateStatus('idle');
                     }
@@ -56,7 +64,7 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
         };
 
         checkStatus();
-        const interval = setInterval(checkStatus, 2000); // Poll every 2s
+        const interval = setInterval(checkStatus, 2000); 
         return () => { isMounted = false; clearInterval(interval); };
     }, [updateStatus, updateAvailable]); 
 
@@ -73,8 +81,7 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
             cancelText: 'Cancel',
             onConfirm: async () => {
                 await triggerAppUpdate(updateAvailable.url, updateAvailable.name);
-                setUpdateStatus('downloading'); // Immediate UI feedback
-                // Alert removed to prevent confusion
+                setUpdateStatus('downloading'); 
             }
         });
     };
@@ -89,15 +96,28 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
 
     // --- SETTINGS LOGIC ---
     const handleChange = async (key: keyof typeof settings, value: any) => {
-        if (key === 'enableYomitan' && value === true) {
-             try {
-                showProgress('Installing dictionaries...');
-                const res = await apiRequest<{status: string, message: string}>('/api/yomitan/install-defaults', { method: 'POST' });
-                closeDialog();
-                if (res.status === 'ok' && res.message.includes('Imported')) showAlert('Success', 'Dictionaries installed.');
-            } catch (e) { closeDialog(); }
-        }
+        // Update local state immediately for responsiveness
         setLocalSettings((prev) => ({ ...prev, [key]: value }));
+
+        if (key === 'enableYomitan' && value === true) {
+             // Perform install check in background (inline) instead of blocking GlobalDialog
+             try {
+                setIsInstalling(true);
+                setInstallMessage('Checking dictionaries...');
+                
+                const res = await apiRequest<{status: string, message: string}>('/api/yomitan/install-defaults', { method: 'POST' });
+                
+                if (res.status === 'ok' && res.message.includes('Imported')) {
+                    // Force refresh of the manager list
+                    setDictManagerKey(prev => prev + 1);
+                }
+            } catch (e) { 
+                console.error("Failed to install defaults", e);
+            } finally {
+                setIsInstalling(false);
+                setInstallMessage('');
+            }
+        }
     };
 
     const save = () => {
@@ -162,6 +182,8 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
     const isNativeApp = typeof navigator !== 'undefined' && navigator.userAgent.includes('MangatanNative');
     const isiOS = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent);
 
+    const showDicts = isNativeApp || localSettings.enableYomitan;
+
     return (
         <div className="ocr-modal-overlay" onClick={onClose}>
             <div className="ocr-modal" onClick={(e) => e.stopPropagation()}>
@@ -172,12 +194,9 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                     <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept=".zip" onChange={handleFileChange} />
 
                     {/* --- UPDATE BANNER --- */}
-                    
-                    {/* DOWNLOADING STATE */}
                     {updateStatus === 'downloading' && (
                         <div style={{ backgroundColor: '#f39c12', color: 'white', padding: '15px', borderRadius: '5px', marginBottom: '15px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}>
                             <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
-                                {/* Simple CSS Spinner */}
                                 <div style={{
                                     width: '18px', height: '18px', 
                                     border: '3px solid rgba(255,255,255,0.3)', 
@@ -191,8 +210,6 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                             <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
                         </div>
                     )}
-
-                    {/* READY STATE */}
                     {updateStatus === 'ready' && (
                         <div style={{ backgroundColor: '#27ae60', color: 'white', padding: '10px', borderRadius: '5px', marginBottom: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span><b>Download Complete</b></span>
@@ -201,8 +218,6 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                             </button>
                         </div>
                     )}
-
-                    {/* IDLE + UPDATE AVAILABLE */}
                     {updateStatus === 'idle' && updateAvailable && (
                         <div style={{ backgroundColor: '#3498db', color: 'white', padding: '10px', borderRadius: '5px', marginBottom: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span><b>New Version:</b> {updateAvailable.version}</span>
@@ -211,14 +226,145 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                             </button>
                         </div>
                     )}
-
                     <div style={{ textAlign: 'center', marginBottom: '10px', color: '#666', fontSize: '0.9em' }}>
                         Version: {appVersion}
                     </div>
 
-                    {(isNativeApp || localSettings.enableYomitan) && (
-                        <DictionaryManager key={dictManagerKey} onImportClick={handleImportClick} />
+                    {/* --- POPUP DICTIONARY SECTION --- */}
+                    <h3>Popup Dictionary</h3>
+                    <div style={sectionBoxStyle}>
+                        <label style={checkboxLabelStyle}>
+                            <input 
+                                type="checkbox" 
+                                checked={localSettings.enableYomitan} 
+                                onChange={e => handleChange('enableYomitan', e.target.checked)} 
+                                style={checkboxInputStyle} 
+                            />
+                            Enable Popup Dictionary
+                        </label>
+                        
+                        {/* Wrapper for smooth sliding transition */}
+                        <div style={{
+                            maxHeight: showDicts ? '800px' : '0px',
+                            opacity: showDicts ? 1 : 0,
+                            overflow: 'hidden',
+                            transition: 'max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-in-out',
+                        }}>
+                             <div style={{ paddingTop: '15px' }}>
+                                {isInstalling && (
+                                    <div style={{ fontSize: '0.9em', color: '#aaa', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <div style={{
+                                            width: '12px', height: '12px', 
+                                            border: '2px solid rgba(255,255,255,0.2)', 
+                                            borderTop: '2px solid white', 
+                                            borderRadius: '50%',
+                                            animation: 'spin 1s linear infinite'
+                                        }} />
+                                        {installMessage}
+                                    </div>
+                                )}
+                                <DictionaryManager key={dictManagerKey} onImportClick={handleImportClick} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* --- ANKI CONNECT SECTION --- */}
+                    {!isiOS && (
+                        <>
+                        <h3>AnkiConnect Integration</h3>
+                        <div style={sectionBoxStyle}>
+                            <label style={checkboxLabelStyle}>
+                                <input 
+                                    type="checkbox" 
+                                    checked={localSettings.ankiConnectEnabled ?? false} 
+                                    onChange={(e) => handleChange('ankiConnectEnabled', e.target.checked)} 
+                                    style={checkboxInputStyle} 
+                                />
+                                <div>
+                                    Enable AnkiConnect
+                                    <div style={{ opacity: 0.5, fontSize: '0.9em' }}>
+                                        Right-click (long press on mobile) any text box to update the last Anki card
+                                    </div>
+                                </div>
+                            </label>
+
+                            {/* Collapsible Anki Settings */}
+                            <div style={{
+                                maxHeight: localSettings.ankiConnectEnabled ? '800px' : '0px',
+                                opacity: localSettings.ankiConnectEnabled ? 1 : 0,
+                                overflow: 'hidden',
+                                transition: 'max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-in-out',
+                            }}>
+                                <div style={{ marginTop: '10px', paddingLeft: '5px' }}>
+                                    <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                        <label style={{ ...checkboxLabelStyle, marginBottom: '0' }}>
+                                            <input 
+                                                type="checkbox" 
+                                                checked={localSettings.ankiEnableCropper ?? false} 
+                                                onChange={(e) => handleChange('ankiEnableCropper', e.target.checked)} 
+                                                style={checkboxInputStyle} 
+                                            />
+                                            <div>
+                                                Enable Image Cropper
+                                                <div style={{ opacity: 0.5, fontSize: '0.9em' }}>
+                                                    Allows you to crop the image before sending to Anki
+                                                </div>
+                                            </div>
+                                        </label>
+                                    </div>
+
+                                    <div className="grid">
+                                        <label htmlFor="ankiUrl">AnkiConnect URL</label>
+                                        <input 
+                                            id="ankiUrl" 
+                                            value={localSettings.ankiConnectUrl ?? 'http://127.0.0.1:8765'} 
+                                            onChange={(e) => handleChange('ankiConnectUrl', e.target.value)} 
+                                            placeholder="http://127.0.0.1:8765"
+                                        />
+
+                                        <label htmlFor="ankiSent">Sentence Field</label>
+                                        <input 
+                                            id="ankiSent" 
+                                            value={localSettings.ankiSentenceField ?? ''} 
+                                            onChange={(e) => handleChange('ankiSentenceField', e.target.value)} 
+                                            placeholder="Leave empty to skip"
+                                        />
+
+                                        <label htmlFor="ankiImg">Picture Field</label>
+                                        <input 
+                                            id="ankiImg" 
+                                            value={localSettings.ankiImageField ?? ''} 
+                                            onChange={(e) => handleChange('ankiImageField', e.target.value)} 
+                                            placeholder="Leave empty to skip"
+                                        />
+
+                                        <label htmlFor="ankiQuality">Image Quality</label>
+                                        <input 
+                                            id="ankiQuality" 
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            max="1"
+                                            value={localSettings.ankiImageQuality ?? 0.92} 
+                                            onChange={(e) => handleChange('ankiImageQuality', parseFloat(e.target.value))} 
+                                            placeholder="0.92"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        </>
                     )}
+
+                    <h3>General Settings</h3>
+                    <div className="checkboxes">
+                        <label style={checkboxLabelStyle}><input type="checkbox" checked={localSettings.enableOverlay} onChange={(e) => handleChange('enableOverlay', e.target.checked)} style={checkboxInputStyle} />Enable Text Overlay</label>
+                        <label style={checkboxLabelStyle}><input type="checkbox" checked={localSettings.soloHoverMode} onChange={(e) => handleChange('soloHoverMode', e.target.checked)} style={checkboxInputStyle} />Solo Hover</label>
+                        <label style={checkboxLabelStyle}><input type="checkbox" checked={localSettings.addSpaceOnMerge} onChange={(e) => handleChange('addSpaceOnMerge', e.target.checked)} style={checkboxInputStyle} />Add Space on Merge</label>
+                        <label style={checkboxLabelStyle}><input type="checkbox" checked={localSettings.mobileMode} onChange={(e) => handleChange('mobileMode', e.target.checked)} style={checkboxInputStyle} />Mobile Mode</label>
+                        <label style={checkboxLabelStyle}><input type="checkbox" checked={localSettings.debugMode} onChange={(e) => handleChange('debugMode', e.target.checked)} style={checkboxInputStyle} />Debug Mode</label>
+                        <label style={checkboxLabelStyle}><input type="checkbox" checked={localSettings.disableStatusIcon} onChange={(e) => handleChange('disableStatusIcon', e.target.checked)} style={checkboxInputStyle} />Disable Status Icon</label>
+                    </div>                    
 
                     <h3>Visuals</h3>
                     <div className="grid">
@@ -257,108 +403,13 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                     <h3>Interaction</h3>
                     <div className="grid">
                         <label htmlFor="interactMode">Mode</label>
-                        <select id="interactMode" value={localSettings.interactionMode} onChange={(e) => handleChange('interactionMode', e.target.value)}>
+                        <select id="interactMode" value={localSettings.interactionMode} onChange={(e) => handleChange('interactMode', e.target.value)}>
                             <option value="hover">Hover</option><option value="click">Click</option>
                         </select>
                         <label htmlFor="delKey">Delete Key</label>
                         <input id="delKey" value={localSettings.deleteModifierKey} onChange={(e) => handleChange('deleteModifierKey', e.target.value)} placeholder="Alt, Control, Shift..." />
                         <label htmlFor="mergeKey">Merge Key</label>
                         <input id="mergeKey" value={localSettings.mergeModifierKey} onChange={(e) => handleChange('mergeModifierKey', e.target.value)} placeholder="Alt, Control, Shift..." />
-                    </div>
-
-                    {!isiOS && (
-                        <>
-                        <h3>AnkiConnect Integration</h3>
-                        
-                        <label style={checkboxLabelStyle}>
-                            <input 
-                                type="checkbox" 
-                                checked={localSettings.ankiConnectEnabled ?? false} 
-                                onChange={(e) => handleChange('ankiConnectEnabled', e.target.checked)} 
-                                style={checkboxInputStyle} 
-                            />
-                            <div>
-                                Enable AnkiConnect
-                                <div style={{ opacity: 0.5, fontSize: '0.9em' }}>
-                                    Right-click (long press on mobile) any text box to update the last Anki card
-                                </div>
-                            </div>
-                        </label>
-
-                        {localSettings.ankiConnectEnabled && (
-                            <div>
-                                <label style={{ ...checkboxLabelStyle, marginBottom: '15px' }}>
-                                    <input 
-                                        type="checkbox" 
-                                        checked={localSettings.ankiEnableCropper ?? false} 
-                                        onChange={(e) => handleChange('ankiEnableCropper', e.target.checked)} 
-                                        style={checkboxInputStyle} 
-                                    />
-                                    <div>
-                                        Enable Image Cropper
-                                        <div style={{ opacity: 0.5, fontSize: '0.9em' }}>
-                                            Allows you to crop the image before sending to Anki
-                                        </div>
-                                    </div>
-                                </label>
-
-                                <div className="grid">
-                                    <label htmlFor="ankiUrl">AnkiConnect URL</label>
-                                    <input 
-                                        id="ankiUrl" 
-                                        value={localSettings.ankiConnectUrl ?? 'http://127.0.0.1:8765'} 
-                                        onChange={(e) => handleChange('ankiConnectUrl', e.target.value)} 
-                                        placeholder="http://127.0.0.1:8765"
-                                    />
-
-                                    <label htmlFor="ankiSent">Sentence Field</label>
-                                    <input 
-                                        id="ankiSent" 
-                                        value={localSettings.ankiSentenceField ?? ''} 
-                                        onChange={(e) => handleChange('ankiSentenceField', e.target.value)} 
-                                        placeholder="Leave empty to skip"
-                                    />
-
-                                    <label htmlFor="ankiImg">Picture Field</label>
-                                    <input 
-                                        id="ankiImg" 
-                                        value={localSettings.ankiImageField ?? ''} 
-                                        onChange={(e) => handleChange('ankiImageField', e.target.value)} 
-                                        placeholder="Leave empty to skip"
-                                    />
-
-                                    <label htmlFor="ankiQuality">Image Quality</label>
-                                    <input 
-                                        id="ankiQuality" 
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        max="1"
-                                        value={localSettings.ankiImageQuality ?? 0.92} 
-                                        onChange={(e) => handleChange('ankiImageQuality', parseFloat(e.target.value))} 
-                                        placeholder="0.92"
-                                    />
-                                </div>
-                            </div>
-                        )}
-                        </>
-                    )}
-                    
-                    <h3>Miscellaneous</h3>
-
-                    <div className="checkboxes">
-                        <label style={checkboxLabelStyle}><input type="checkbox" checked={localSettings.enableOverlay} onChange={(e) => handleChange('enableOverlay', e.target.checked)} style={checkboxInputStyle} />Enable Text Overlay</label>
-                        
-                        <label style={checkboxLabelStyle}>
-                            <input type="checkbox" checked={localSettings.enableYomitan} onChange={e => handleChange('enableYomitan', e.target.checked)} style={checkboxInputStyle} />
-                            Enable Popup Dictionary
-                        </label>
-
-                        <label style={checkboxLabelStyle}><input type="checkbox" checked={localSettings.soloHoverMode} onChange={(e) => handleChange('soloHoverMode', e.target.checked)} style={checkboxInputStyle} />Solo Hover</label>
-                        <label style={checkboxLabelStyle}><input type="checkbox" checked={localSettings.addSpaceOnMerge} onChange={(e) => handleChange('addSpaceOnMerge', e.target.checked)} style={checkboxInputStyle} />Add Space on Merge</label>
-                        <label style={checkboxLabelStyle}><input type="checkbox" checked={localSettings.mobileMode} onChange={(e) => handleChange('mobileMode', e.target.checked)} style={checkboxInputStyle} />Mobile Mode</label>
-                        <label style={checkboxLabelStyle}><input type="checkbox" checked={localSettings.debugMode} onChange={(e) => handleChange('debugMode', e.target.checked)} style={checkboxInputStyle} />Debug Mode</label>
-                        <label style={checkboxLabelStyle}><input type="checkbox" checked={localSettings.disableStatusIcon} onChange={(e) => handleChange('disableStatusIcon', e.target.checked)} style={checkboxInputStyle} />Disable Status Icon</label>
                     </div>
                 </div>
                 <div className="ocr-modal-footer">
