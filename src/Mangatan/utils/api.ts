@@ -69,19 +69,7 @@ const resolveChapterId = async (mangaId: number, chapterNumber: number): Promise
         throw new Error("Failed to retrieve chapter list from GraphQL");
     }
 
-    const hasChapterZero = chapters.some((ch: any) => Number(ch.chapterNumber) === 0);
-
-    let targetChapterNum = chapterNumber;
-    if (hasChapterZero) {
-        targetChapterNum -= 1;
-    }
-    const match = chapters.find((ch: any) => Number(ch.chapterNumber) === targetChapterNum);
-
-    if (!match) {
-        throw new Error(`Chapter number ${targetChapterNum} (original: ${chapterNumber}) not found in manga ${mangaId}`);
-    }
-
-    return parseInt(match.id, 10);
+    return parseInt(chapters[chapterNumber - 1].id, 10);
 };
 
 export const fetchChapterPagesGraphQL = async (chapterId: number) => {
@@ -207,7 +195,7 @@ export const preprocessChapter = async (baseUrl: string, chapterPath: string, cr
     }
 
     const mangaId = parseInt(mangaMatch[1], 10);
-    const chapterNum = parseFloat(chapterMatch[1]); 
+    const chapterNum = parseInt(chapterMatch[1], 10); 
 
     const internalChapterId = await resolveChapterId(mangaId, chapterNum);
     const pages = await fetchChapterPagesGraphQL(internalChapterId);
