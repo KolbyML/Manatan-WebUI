@@ -16,6 +16,7 @@ export const CropperModal: React.FC<CropperModalProps> = ({
     onCancel,
     quality 
 }) => {
+    // Default crop is 80% of the image, centered
     const [crop, setCrop] = useState<Crop>({
         unit: '%',
         x: 10,
@@ -27,14 +28,29 @@ export const CropperModal: React.FC<CropperModalProps> = ({
     const [imgRef, setImgRef] = useState<HTMLImageElement | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
+    const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+        setIsLoading(false);
+        const { width, height } = e.currentTarget;
+        
+        // Initialize completedCrop immediately with the default percentage crop converted to pixels
+        // This allows the Confirm button to work without moving the selection
+        const initialPixelCrop: PixelCrop = {
+            unit: 'px',
+            x: (crop.x / 100) * width,
+            y: (crop.y / 100) * height,
+            width: (crop.width / 100) * width,
+            height: (crop.height / 100) * height
+        };
+        
+        setCompletedCrop(initialPixelCrop);
+    };
+
     const handleConfirm = async () => {
         if (!completedCrop || !imgRef) return;
 
-        // Get the scale factor between displayed size and natural size
         const scaleX = imgRef.naturalWidth / imgRef.width;
         const scaleY = imgRef.naturalHeight / imgRef.height;
 
-        // Scale the crop coordinates to match the natural image size
         const pixelCrop = {
             x: completedCrop.x * scaleX,
             y: completedCrop.y * scaleY,
@@ -80,7 +96,7 @@ export const CropperModal: React.FC<CropperModalProps> = ({
                         justifyContent: 'center',
                         alignItems: 'center',
                         overflow: 'auto',
-                        backgroundColor: '#111' // Dark background for better contrast
+                        backgroundColor: '#111' 
                     }}
                 >
                     {isLoading && (
@@ -102,13 +118,14 @@ export const CropperModal: React.FC<CropperModalProps> = ({
                             ref={setImgRef}
                             src={imageSrc} 
                             alt="Crop preview"
-                            crossOrigin="anonymous" // Helps hit browser cache if main image used CORS
-                            onLoad={() => setIsLoading(false)}
+                            crossOrigin="anonymous"
+                            onLoad={onImageLoad}
+                            onError={() => setIsLoading(false)}
                             style={{ 
                                 maxWidth: '100%', 
                                 maxHeight: 'calc(60vh - 40px)',
                                 display: 'block',
-                                opacity: isLoading ? 0 : 1, // Fade in
+                                opacity: isLoading ? 0 : 1, 
                                 transition: 'opacity 0.2s'
                             }}
                         />

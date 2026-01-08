@@ -2,7 +2,7 @@ import React, { useRef, useState, useLayoutEffect, useEffect } from 'react';
 import { OcrBlock } from '@/Mangatan/types';
 import { useOCR } from '@/Mangatan/context/OCRContext';
 import { cleanPunctuation, lookupYomitan } from '@/Mangatan/utils/api';
-import { createCard, updateLastCard, imageUrlToBase64Webp } from '@/Mangatan/utils/anki';
+import { updateLastCard } from '@/Mangatan/utils/anki';
 import { CropperModal } from '@/Mangatan/components/CropperModal';
 import { createPortal } from 'react-dom';
 
@@ -15,9 +15,6 @@ const calculateFontSize = (text: string, w: number, h: number, isVertical: boole
     const safeH = h * 0.85;
 
     if (isVertical) {
-        // In vertical text:
-        // Width dictates how many columns (lines) fit
-        // Height dictates how long a column can be
         const maxFontSizeByWidth = safeW / lineCount;
         const maxFontSizeByHeight = safeH / maxLineLength;
         size = Math.min(maxFontSizeByWidth, maxFontSizeByHeight);
@@ -51,7 +48,6 @@ export const TextBox: React.FC<{
         showProgress,
         showAlert,
         closeDialog,
-        serverSettings
     } = useOCR();
     const [isEditing, setIsEditing] = useState(false);
     const [isActive, setIsActive] = useState(false); 
@@ -59,10 +55,7 @@ export const TextBox: React.FC<{
     const [showCropper, setShowCropper] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
 
-    // FIX: Track if we just activated the box to prevent "1-click" lookup on Android
     const justActivated = useRef(false);
-
-    // Track popup state via ref to access inside event listeners safely
     const dictPopupRef = useRef(dictPopup.visible);
     useEffect(() => { dictPopupRef.current = dictPopup.visible; }, [dictPopup.visible]);
 
@@ -82,7 +75,6 @@ export const TextBox: React.FC<{
         const pxH = block.tightBoundingBox.height * containerRect.height;
 
         if (!isEditing) {
-            // Respect newlines added by the backend
             const displayTxt = cleanPunctuation(block.text, settings.addSpaceOnMerge).replace(/\u200B/g, '\n');
             setFontSize(calculateFontSize(displayTxt, pxW + adj, pxH + adj, isVertical, settings));
         }
@@ -91,14 +83,11 @@ export const TextBox: React.FC<{
     let displayContent = isEditing ? block.text : cleanPunctuation(block.text, settings.addSpaceOnMerge);
     displayContent = displayContent.replace(/\u200B/g, '\n');
 
-    // --- NATIVE SELECTION HANDLER ---
     useLayoutEffect(() => {
         const selection = window.getSelection();
         if (!selection) return;
 
-        // Explicitly clear selection when popup closes to remove the highlight pins/color
         if (!dictPopup.visible) {
-            // Only clear selection if WE are the active box
             if (isActive) selection.removeAllRanges();
             return;
         }
@@ -127,20 +116,15 @@ export const TextBox: React.FC<{
         }
     }, [dictPopup.visible, dictPopup.highlight, imgSrc, index, displayContent, isActive]);
 
-    // --- GLOBAL CLICK LISTENER ---
     useEffect(() => {
         if (!isActive || !settings.mobileMode) return;
         
         const handleGlobalClick = (e: MouseEvent | TouchEvent) => {
             const target = e.target as Element;
-
-            // If popup is open or was just closed, ignore this click to prevent closing the text box
             if (dictPopupRef.current || wasPopupClosedRecently()) return;
-
             if (target && (target.closest('.yomitan-popup') || target.closest('.yomitan-backdrop'))) {
                 return; 
             }
-
             if (ref.current && !ref.current.contains(target as Node)) {
                 setIsActive(false);
                 setIsEditing(false);
@@ -164,6 +148,20 @@ export const TextBox: React.FC<{
         }
     }, [isActive, isEditing, settings.mobileMode, index, onUpdate, displayContent]);
 
+    // Helper to get correct Anki field from mapping settings
+    const getTargetField = (type: 'Image' | 'Sentence') => {
+        console.log('Getting target field for type:', type);
+        if (settings.ankiFieldMap) {
+            console.log('Anki field map:', settings.ankiFieldMap);
+            // Find key where value === type (e.g. Find key "Picture" where value is "Image")
+            console.log('Searching for field mapping for type:', type);
+            const mapped = Object.keys(settings.ankiFieldMap).find(key => settings.ankiFieldMap![key] === type);
+            console.log('Mapped field found:', mapped);
+            if (mapped) return mapped;
+        }
+        return '';
+    };
+
     const handleAnkiRequest = async (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
@@ -177,31 +175,29 @@ export const TextBox: React.FC<{
         content = content.replace(/\u200B/g, '\n');
 
         if (settings.ankiEnableCropper) {
-            // Show cropper modal
             setShowCropper(true);
         } else {
-            // Direct update without cropper
             showConfirm(
                 'Update Anki Card?',
                 'This will overwrite the image and text of the last added card in Anki.',
                 async () => {
                     try {
                         showProgress('Updating Anki card...');
-
-                        const { updateLastCard } = await import('@/Mangatan/utils/anki');
+                        
+                        const imgField = getTargetField('Image');
+                        const sentField = getTargetField('Sentence');
 
                         await updateLastCard(
                             settings.ankiConnectUrl || 'http://127.0.0.1:8765',
                             imgSrc,
                             content,
-                            settings.ankiImageField || '',
-                            settings.ankiSentenceField || '',
+                            imgField || '',
+                            sentField || '',
                             settings.ankiImageQuality || 0.92
                         );
                         
                         closeDialog();
                         showAlert('Success', 'Anki card updated successfully!');
-
                     } catch (err: any) {
                         closeDialog();
                         showAlert('Anki Error', err.message || 'Failed to update Anki card');
@@ -213,7 +209,6 @@ export const TextBox: React.FC<{
 
     const handleCropperComplete = async (croppedImage: string) => {
         setShowCropper(false);
-
         let content = cleanPunctuation(block.text, settings.addSpaceOnMerge);
         content = content.replace(/\u200B/g, '\n');
 
@@ -223,75 +218,49 @@ export const TextBox: React.FC<{
             async () => {
                 try {
                     showProgress('Updating Anki card...');
+                    
+                    const imgField = getTargetField('Image');
+                    const sentField = getTargetField('Sentence');
 
                     // Manually construct the update since we already have the cropped image
                     const id = await (async () => {
                         const ankiConnectUrl = settings.ankiConnectUrl || 'http://127.0.0.1:8765';
                         const res = await fetch(ankiConnectUrl, {
                             method: 'POST',
-                            body: JSON.stringify({ 
-                                action: 'findNotes', 
-                                params: { query: 'added:1' }, 
-                                version: 6 
-                            })
+                            body: JSON.stringify({ action: 'findNotes', params: { query: 'added:1' }, version: 6 })
                         });
                         const json = await res.json();
                         if (!json.result || !Array.isArray(json.result)) return undefined;
                         return json.result.sort().at(-1);
                     })();
 
-                    if (!id) {
-                        throw new Error('Could not find recent card (no cards created today)');
+                    if (!id) throw new Error('Could not find recent card (no cards created today)');
+
+                    const updatePayload: any = { note: { id, fields: {} } };
+                    
+                    if (sentField && sentField.trim() && content) {
+                        updatePayload.note.fields[sentField] = content;
                     }
-
-                    const cardAge = Math.floor((Date.now() - id) / 60000);
-                    if (cardAge >= 5) {
-                        throw new Error('Card created over 5 minutes ago');
-                    }
-
-                    const fields: Record<string, any> = {};
-                    const updatePayload: any = {
-                        note: {
-                            id,
-                            fields
-                        }
-                    };
-
-                    // Handle sentence field
-                    if (settings.ankiSentenceField && settings.ankiSentenceField.trim() && content) {
-                        fields[settings.ankiSentenceField] = content;
-                    }
-
-                    // Handle picture field with cropped image
-                    if (settings.ankiImageField && settings.ankiImageField.trim()) {
-                        fields[settings.ankiImageField] = '';
-
+                    
+                    if (imgField && imgField.trim()) {
+                        updatePayload.note.fields[imgField] = ''; 
                         updatePayload.note.picture = {
                             filename: `mangatan_${id}.webp`,
                             data: croppedImage.split(';base64,')[1],
-                            fields: [settings.ankiImageField]
+                            fields: [imgField]
                         };
                     }
 
-                    // Make the request
                     const ankiConnectUrl = settings.ankiConnectUrl || 'http://127.0.0.1:8765';
                     const res = await fetch(ankiConnectUrl, {
                         method: 'POST',
-                        body: JSON.stringify({ 
-                            action: 'updateNoteFields', 
-                            params: updatePayload, 
-                            version: 6 
-                        })
+                        body: JSON.stringify({ action: 'updateNoteFields', params: updatePayload, version: 6 })
                     });
                     const json = await res.json();
-
-                    if (json.error) {
-                        throw new Error(json.error);
-                    }
+                    if (json.error) throw new Error(json.error);
                     
                     closeDialog();
                     showAlert('Success', 'Anki card updated successfully!');
-
                 } catch (err: any) {
                     closeDialog();
                     showAlert('Anki Error', err.message || 'Failed to update Anki card');
@@ -300,17 +269,12 @@ export const TextBox: React.FC<{
         );
     };
 
-    // FIX: HANDLE FIRST TAP (ACTIVATION)
     const handleTouchStart = (e: React.TouchEvent) => {
         if (!settings.mobileMode) return;
-        
         if (!isActive) {
             setIsActive(true);
-            
-            // Set flag to block the subsequent click event from triggering lookup
             justActivated.current = true;
             setTimeout(() => justActivated.current = false, 500);
-
             if (e.cancelable) e.preventDefault();
         }
     };
@@ -337,9 +301,6 @@ export const TextBox: React.FC<{
                 setMergeAnchor(null);
             }
         } else {
-            // FIX: ANDROID 2-CLICK GUARD
-            // If we just activated this box (via touchStart), OR if isActive is somehow false,
-            // STOP here. Do not lookup.
             if (settings.mobileMode && (justActivated.current || !isActive)) {
                 if (!isActive) setIsActive(true);
                 return;
@@ -347,7 +308,6 @@ export const TextBox: React.FC<{
 
             if (!settings.enableYomitan) return;
 
-            // --- YOMITAN LOOKUP ---
             let charOffset = 0;
             let range: Range | null = null;
             
@@ -357,22 +317,6 @@ export const TextBox: React.FC<{
             } else if ((document as any).caretPositionFromPoint) {
                 const pos = (document as any).caretPositionFromPoint(e.clientX, e.clientY);
                 if (pos) charOffset = pos.offset;
-            }
-
-            if (range && range.startContainer.nodeType === Node.TEXT_NODE && charOffset > 0) {
-                try {
-                    const testRange = document.createRange();
-                    testRange.setStart(range.startContainer, charOffset - 1);
-                    testRange.setEnd(range.startContainer, charOffset);
-                    const rects = testRange.getClientRects();
-                    for (let i = 0; i < rects.length; i++) {
-                        const rect = rects[i];
-                        if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
-                            charOffset -= 1;
-                            break;
-                        }
-                    }
-                } catch (err) {}
             }
 
             let content = cleanPunctuation(block.text, settings.addSpaceOnMerge);
@@ -389,7 +333,8 @@ export const TextBox: React.FC<{
                 results: [],
                 isLoading: true,
                 systemLoading: false,
-                highlight: undefined 
+                highlight: undefined,
+                context: { imgSrc, sentence: content }
             });
 
             const results = await lookupYomitan(content, byteIndex);
@@ -397,19 +342,12 @@ export const TextBox: React.FC<{
             if (results === 'loading') {
                  setDictPopup(prev => ({ ...prev, results: [], isLoading: false, systemLoading: true }));
             } else {
-                const matchLen = (results && results.length > 0 && results[0].matchLen) ? results[0].matchLen : 1;
-                
                 setDictPopup(prev => ({ 
                     ...prev, 
                     results: results, 
                     isLoading: false, 
                     systemLoading: false,
-                    highlight: {
-                        imgSrc,
-                        index,
-                        startChar: charOffset,
-                        length: matchLen
-                    }
+                    highlight: { imgSrc, index, startChar: charOffset, length: (results && results[0]?.matchLen) || 1 }
                 }));
             }
         }
@@ -417,31 +355,14 @@ export const TextBox: React.FC<{
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (isEditing) return;
-        if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            setIsEditing(true);
-        }
-        if (e.key === 'Delete') {
-            e.preventDefault();
-            onDelete(index);
-        }
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsEditing(true); }
+        if (e.key === 'Delete') { e.preventDefault(); onDelete(index); }
     };
 
     const isMergedTarget = mergeAnchor?.imgSrc === imgSrc && mergeAnchor?.index === index;
+    const isLookingUp = dictPopup.visible && dictPopup.highlight?.imgSrc === imgSrc && dictPopup.highlight?.index === index;
 
-    // Check if this box is the one currently being looked up
-    const isLookingUp = dictPopup.visible && 
-                        dictPopup.highlight?.imgSrc === imgSrc && 
-                        dictPopup.highlight?.index === index;
-
-    const classes = [
-        'gemini-ocr-text-box',
-        isVertical ? 'vertical' : '',
-        isEditing ? 'editing' : '',
-        isMergedTarget ? 'merge-target' : '',
-        isActive ? 'mobile-active' : '',
-        isLookingUp ? 'active-lookup' : '' // FIX: Added class to force visibility
-    ].filter(Boolean).join(' ');
+    const classes = ['gemini-ocr-text-box', isVertical ? 'vertical' : '', isEditing ? 'editing' : '', isMergedTarget ? 'merge-target' : '', isActive ? 'mobile-active' : '', isLookingUp ? 'active-lookup' : ''].filter(Boolean).join(' ');
 
     return (
         <>
@@ -455,10 +376,7 @@ export const TextBox: React.FC<{
                 suppressContentEditableWarning
                 onDoubleClick={() => setIsEditing(true)}
                 onContextMenu={(e) => {
-                    // Check if user holds Shift or other logic if needed
-                    if (settings.ankiConnectEnabled && !e.shiftKey) { 
-                        handleAnkiRequest(e);
-                    }
+                    if (settings.ankiConnectEnabled && !e.shiftKey) handleAnkiRequest(e);
                 }}
                 onBlur={() => {
                     if (settings.mobileMode) return;
@@ -489,7 +407,6 @@ export const TextBox: React.FC<{
             >
                 {displayContent}
             </div>
-
             {showCropper && createPortal(
                 <CropperModal
                     imageSrc={imgSrc}

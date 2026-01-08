@@ -40,10 +40,13 @@ export interface Settings {
     site: SiteConfig;
     ankiConnectEnabled: boolean;
     ankiConnectUrl: string;
-    ankiSentenceField: string;
-    ankiImageField: string;
     ankiImageQuality: number;
     ankiEnableCropper: boolean;
+    // New Anki Settings
+    ankiDeck?: string;
+    ankiModel?: string;
+    ankiFieldMap?: Record<string, string>;
+    ankiCheckDuplicates?: boolean;
 }
 
 export type MergeState = { imgSrc: string; index: number; } | null;
@@ -59,13 +62,18 @@ export interface DictionaryResult {
     definitions: DictionaryDefinition[];
     forms?: { headword: string; reading: string }[];
     source?: number;
-    matchLen?: number; // Added to support highlighting
+    matchLen?: number; 
 }
 
 export interface DictionaryDefinition {
     dictionaryName: string;
     tags: string[];
     content: string[];
+}
+
+export interface DictPopupContext {
+    imgSrc: string;
+    sentence: string;
 }
 
 export interface DictPopupState {
@@ -75,13 +83,13 @@ export interface DictPopupState {
     results: DictionaryResult[];
     isLoading: boolean;
     systemLoading?: boolean;
-    // Added for highlighting
     highlight?: {
         imgSrc: string;
         index: number;
         startChar: number;
         length: number;
-    }
+    };
+    context?: DictPopupContext; 
 }
 
 // --- GLOBAL DIALOG STATE ---
@@ -135,10 +143,12 @@ export const DEFAULT_SETTINGS: Settings = {
     },
     ankiConnectEnabled: false,
     ankiConnectUrl: 'http://127.0.0.1:8765',
-    ankiSentenceField: '',
-    ankiImageField: '',
     ankiImageQuality: 0.92,
-    ankiEnableCropper: false
+    ankiEnableCropper: false,
+    ankiDeck: '',
+    ankiModel: '',
+    ankiFieldMap: {},
+    ankiCheckDuplicates: true
 };
 
 export const COLOR_THEMES: Record<ColorTheme, { accent: string; background: string }> = {
