@@ -268,39 +268,40 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
 
                     {!isiOS && (
                         <>
-                            <h3>AnkiConnect Integration</h3>
-                            
-                            <label style={checkboxLabelStyle}>
-                                <input 
-                                    type="checkbox" 
-                                    checked={localSettings.ankiConnectEnabled ?? false} 
-                                    onChange={(e) => handleChange('ankiConnectEnabled', e.target.checked)} 
-                                    style={checkboxInputStyle} 
-                                />
-                                <div>
-                                    Enable AnkiConnect
-                                    <div style={{ opacity: 0.5, fontSize: '0.9em' }}>
-                                        Right-click (long press on mobile) any text box to update the last Anki card
-                                    </div>
+                        <h3>AnkiConnect Integration</h3>
+                        
+                        <label style={checkboxLabelStyle}>
+                            <input 
+                                type="checkbox" 
+                                checked={localSettings.ankiConnectEnabled ?? false} 
+                                onChange={(e) => handleChange('ankiConnectEnabled', e.target.checked)} 
+                                style={checkboxInputStyle} 
+                            />
+                            <div>
+                                Enable AnkiConnect
+                                <div style={{ opacity: 0.5, fontSize: '0.9em' }}>
+                                    Right-click (long press on mobile) any text box to update the last Anki card
                                 </div>
-                            </label>
+                            </div>
+                        </label>
 
-                            <label style={checkboxLabelStyle}>
-                                <input 
-                                    type="checkbox" 
-                                    checked={localSettings.ankiEnableCropper ?? false} 
-                                    onChange={(e) => handleChange('ankiEnableCropper', e.target.checked)} 
-                                    style={checkboxInputStyle} 
-                                />
-                                <div>
-                                    Enable Image Cropper
-                                    <div style={{ opacity: 0.5, fontSize: '0.9em' }}>
-                                        Allows you to crop the image before sending to Anki
+                        {localSettings.ankiConnectEnabled && (
+                            <div>
+                                <label style={{ ...checkboxLabelStyle, marginBottom: '15px' }}>
+                                    <input 
+                                        type="checkbox" 
+                                        checked={localSettings.ankiEnableCropper ?? false} 
+                                        onChange={(e) => handleChange('ankiEnableCropper', e.target.checked)} 
+                                        style={checkboxInputStyle} 
+                                    />
+                                    <div>
+                                        Enable Image Cropper
+                                        <div style={{ opacity: 0.5, fontSize: '0.9em' }}>
+                                            Allows you to crop the image before sending to Anki
+                                        </div>
                                     </div>
-                                </div>
-                            </label>
+                                </label>
 
-                            {localSettings.ankiConnectEnabled && (
                                 <div className="grid">
                                     <label htmlFor="ankiUrl">AnkiConnect URL</label>
                                     <input 
@@ -338,9 +339,12 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                                         placeholder="0.92"
                                     />
                                 </div>
-                            )}
+                            </div>
+                        )}
                         </>
                     )}
+                    
+                    <h3>Miscellaneous</h3>
 
                     <div className="checkboxes">
                         <label style={checkboxLabelStyle}><input type="checkbox" checked={localSettings.enableOverlay} onChange={(e) => handleChange('enableOverlay', e.target.checked)} style={checkboxInputStyle} />Enable Text Overlay</label>

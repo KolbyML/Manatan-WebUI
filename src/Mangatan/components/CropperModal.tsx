@@ -25,6 +25,7 @@ export const CropperModal: React.FC<CropperModalProps> = ({
     });
     const [completedCrop, setCompletedCrop] = useState<PixelCrop | null>(null);
     const [imgRef, setImgRef] = useState<HTMLImageElement | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
     const handleConfirm = async () => {
         if (!completedCrop || !imgRef) return;
@@ -78,9 +79,20 @@ export const CropperModal: React.FC<CropperModalProps> = ({
                         display: 'flex',
                         justifyContent: 'center',
                         alignItems: 'center',
-                        overflow: 'auto'
+                        overflow: 'auto',
+                        backgroundColor: '#111' // Dark background for better contrast
                     }}
                 >
+                    {isLoading && (
+                        <div style={{ position: 'absolute', zIndex: 10 }}>
+                             <div className="ocr-spinner">
+                                <svg className="circular" viewBox="25 25 50 50">
+                                    <circle className="path" cx="50" cy="50" r="20" fill="none" strokeWidth="4" strokeMiterlimit="10"/>
+                                </svg>
+                            </div>
+                        </div>
+                    )}
+                    
                     <ReactCrop
                         crop={crop}
                         onChange={(c) => setCrop(c)}
@@ -90,10 +102,14 @@ export const CropperModal: React.FC<CropperModalProps> = ({
                             ref={setImgRef}
                             src={imageSrc} 
                             alt="Crop preview"
+                            crossOrigin="anonymous" // Helps hit browser cache if main image used CORS
+                            onLoad={() => setIsLoading(false)}
                             style={{ 
                                 maxWidth: '100%', 
                                 maxHeight: 'calc(60vh - 40px)',
                                 display: 'block',
+                                opacity: isLoading ? 0 : 1, // Fade in
+                                transition: 'opacity 0.2s'
                             }}
                         />
                     </ReactCrop>
@@ -102,7 +118,7 @@ export const CropperModal: React.FC<CropperModalProps> = ({
                     <button type="button" onClick={onCancel}>
                         Cancel
                     </button>
-                    <button type="button" className="primary" onClick={handleConfirm}>
+                    <button type="button" className="primary" onClick={handleConfirm} disabled={isLoading}>
                         Confirm
                     </button>
                 </div>
