@@ -47,7 +47,6 @@ export const TextBox: React.FC<{
         wasPopupClosedRecently,
         showConfirm,
         showProgress,
-        showAlert,
         closeDialog,
     } = useOCR();
     const [isEditing, setIsEditing] = useState(false);
@@ -198,7 +197,7 @@ export const TextBox: React.FC<{
                         );
                         
                         closeDialog();
-                        makeToast('Anki card updated successfully!', { variant: 'success', autoHideDuration: 1000 });
+                        makeToast('Anki card updated successfully!', { variant: 'success', autoHideDuration: 1500 });
                     } catch (err: any) {
                         closeDialog();
                         makeToast('Failed to update Anki card', 'error', err.message);
@@ -261,7 +260,7 @@ export const TextBox: React.FC<{
                     if (json.error) throw new Error(json.error);
                     
                     closeDialog();
-                    makeToast('Anki card updated successfully!', { variant: 'success', autoHideDuration: 1000 });
+                    makeToast('Anki card updated successfully!', { variant: 'success', autoHideDuration: 1500 });
                 } catch (err: any) {
                     closeDialog();
                     makeToast('Failed to update Anki card', 'error', err.message);
