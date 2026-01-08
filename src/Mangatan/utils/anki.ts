@@ -1,38 +1,48 @@
 /**
- * Generic AnkiConnect API call
+ * Updated AnkiConnect API call with automatic permission handshake
  */
 async function ankiConnect(
     action: string,
     params: Record<string, any>,
     url: string,
 ) {
-    try {
+    const execute = async () => {
         const res = await fetch(url, {
             method: "POST",
             body: JSON.stringify({ action, params, version: 6 }),
         });
         const json = await res.json();
-
-        if (json.error) {
-            throw new Error(json.error);
-        }
-
+        if (json.error) throw new Error(json.error);
         return json.result;
-    } catch (e: any) {
-        const errorMessage = e?.message ?? String(e);
+    };
 
-        if (
-            e instanceof TypeError && errorMessage.includes("Failed to fetch")
-        ) {
-            throw new Error(
-                "Cannot connect to AnkiConnect. Check that Anki is running and CORS is configured.",
-            );
-        } else {
-            throw new Error(errorMessage);
+    try {
+        return await execute();
+    } catch (e: any) {
+        // If fetch fails, it is likely a CORS block. Attempt handshake.
+        try {
+            const permRes = await fetch(url, {
+                method: "POST",
+                body: JSON.stringify({ action: "requestPermission", version: 6 }),
+            });
+            const permJson = await permRes.json();
+
+            // If user clicked 'Yes' in the Anki popup, retry the original request
+            if (permJson.result && permJson.result.permission === 'granted') {
+                return await execute();
+            }
+        } catch (handshakeError) {
+            console.error("Handshake failed", handshakeError);
         }
+
+        // Standard error handling if handshake doesn't resolve the issue
+        const errorMessage = e?.message ?? String(e);
+        if (e instanceof TypeError && errorMessage.includes("Failed to fetch")) {
+            throw new Error("Connection blocked. Please click 'Yes' on the Anki permission popup.");
+        }
+        throw new Error(errorMessage);
     }
 }
-
 /**
  * Check connection and get version
  */
