@@ -5,6 +5,7 @@ import { cleanPunctuation, lookupYomitan } from '@/Mangatan/utils/api';
 import { updateLastCard } from '@/Mangatan/utils/anki';
 import { CropperModal } from '@/Mangatan/components/CropperModal';
 import { createPortal } from 'react-dom';
+import { makeToast } from '@/base/utils/Toast';
 
 const calculateFontSize = (text: string, w: number, h: number, isVertical: boolean, settings: any) => {
     const lines = text.split('\n');
@@ -46,7 +47,6 @@ export const TextBox: React.FC<{
         wasPopupClosedRecently,
         showConfirm,
         showProgress,
-        showAlert,
         closeDialog,
     } = useOCR();
     const [isEditing, setIsEditing] = useState(false);
@@ -167,7 +167,7 @@ export const TextBox: React.FC<{
         e.stopPropagation();
 
         if (!settings.ankiConnectEnabled) {
-            showAlert('Anki Disabled', 'AnkiConnect integration is disabled in settings.');
+            makeToast('AnkiConnect integration is disabled in settings.', 'warning');
             return;
         }
 
@@ -197,10 +197,10 @@ export const TextBox: React.FC<{
                         );
                         
                         closeDialog();
-                        showAlert('Success', 'Anki card updated successfully!');
+                        makeToast('Anki card updated successfully!', { variant: 'success', autoHideDuration: 1500 });
                     } catch (err: any) {
                         closeDialog();
-                        showAlert('Anki Error', err.message || 'Failed to update Anki card');
+                        makeToast('Failed to update Anki card', 'error', err.message);
                     }
                 }
             );
@@ -260,10 +260,10 @@ export const TextBox: React.FC<{
                     if (json.error) throw new Error(json.error);
                     
                     closeDialog();
-                    showAlert('Success', 'Anki card updated successfully!');
+                    makeToast('Anki card updated successfully!', { variant: 'success', autoHideDuration: 1500 });
                 } catch (err: any) {
                     closeDialog();
-                    showAlert('Anki Error', err.message || 'Failed to update Anki card');
+                    makeToast('Failed to update Anki card', 'error', err.message);
                 }
             }
         );
