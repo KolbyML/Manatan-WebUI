@@ -192,6 +192,7 @@ const BaseReaderChapterViewer = ({
     const isCurrentChapterRef = useRef(isCurrentChapter);
     const imageRefs = useRef<(HTMLElement | null)[]>(pages.map(() => null));
     const pagerRef = useRef<HTMLDivElement>(null);
+    const [errorViewNode, setErrorViewNode] = useState<HTMLElement | null>(null);
 
     const actualPages = useMemo(() => {
         const arePagesLoaded = !!totalPages;
@@ -327,6 +328,9 @@ const BaseReaderChapterViewer = ({
         if (shouldHideChapter) return null;
         return (
             <Box
+                // 1. Use the state setter as a callback ref. 
+                // This triggers a re-render as soon as the Box exists.
+                ref={setErrorViewNode}
                 sx={{
                     minHeight: '100%',
                     minWidth: '100%',
@@ -335,6 +339,20 @@ const BaseReaderChapterViewer = ({
                     position: 'relative',
                 }}
             >
+                {!isPreloadMode && (
+                    <ReaderInfiniteScrollUpdateChapter
+                        chapterId={chapterId}
+                        previousChapterId={previousChapterId}
+                        nextChapterId={nextChapterId}
+                        isCurrentChapter={isCurrentChapter}
+                        isPreviousChapterVisible={isPreviousChapterVisible}
+                        isNextChapterVisible={isNextChapterVisible}
+                        // 2. Pass the STATE variable, not the ref.current
+                        imageWrapper={errorViewNode}
+                        scrollElement={scrollElement}
+                    />
+                )}
+
                 <EmptyViewAbsoluteCentered
                     message={t('global.error.label.failed_to_load_data')}
                     messageExtra={getErrorMessage(pagesResponse.error)}

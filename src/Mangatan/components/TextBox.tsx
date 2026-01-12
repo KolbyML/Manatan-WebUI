@@ -1,5 +1,5 @@
-import React, { useRef, useState, useLayoutEffect, useEffect } from 'react';
-import { OcrBlock, COLOR_THEMES } from '@/Mangatan/types';
+import React, { useRef, useState, useLayoutEffect, useEffect, memo } from 'react';
+import { COLOR_THEMES, OcrBlock } from '@/Mangatan/types';
 import { useOCR } from '@/Mangatan/context/OCRContext';
 import { cleanPunctuation, lookupYomitan } from '@/Mangatan/utils/api';
 import { updateLastCard } from '@/Mangatan/utils/anki';
@@ -26,7 +26,10 @@ const calculateFontSize = (text: string, w: number, h: number, isVertical: boole
         size = Math.min(maxFontSizeByHeight, maxFontSizeByWidth);
         size *= settings.fontMultiplierHorizontal;
     }
-    return Math.max(10, Math.min(size, 200));
+    
+    // Lower minimum font size for mobile to prevent overflow in small bubbles
+    const minSize = settings.mobileMode ? 5 : 10;
+    return Math.max(minSize, Math.min(size, 200));
 };
 
 export const TextBox: React.FC<{
@@ -34,11 +37,13 @@ export const TextBox: React.FC<{
     index: number;
     imgSrc: string;
     spreadData?: { leftSrc: string; rightSrc: string };
-    containerRect: DOMRect;
+    containerWidth: number;
+    containerHeight: number;
     onUpdate: (idx: number, txt: string) => void;
     onMerge: (src: number, target: number) => void;
     onDelete: (idx: number) => void;
-}> = ({ block, index, imgSrc, spreadData, containerRect, onUpdate, onMerge, onDelete }) => {
+    parentVisible?: boolean; 
+}> = memo(({ block, index, imgSrc, spreadData, containerWidth, containerHeight, onUpdate, onMerge, onDelete, parentVisible = true }) => {
     const { 
         settings, 
         mergeAnchor, 
@@ -52,6 +57,7 @@ export const TextBox: React.FC<{
     } = useOCR();
     const [isEditing, setIsEditing] = useState(false);
     const [isActive, setIsActive] = useState(false); 
+    const [isLocalHover, setIsLocalHover] = useState(false); 
     const [fontSize, setFontSize] = useState(16);
     const [showCropper, setShowCropper] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
@@ -91,16 +97,48 @@ export const TextBox: React.FC<{
         ? theme.accent 
         : theme.accent;
 
+    const handleMouseUpFix = (e: React.MouseEvent) => {
+        if (settings.mobileMode) return; 
+
+        const wrapper = document.querySelector('.reader-zoom-wrapper');
+        if (wrapper) {
+            const event = new MouseEvent('mouseup', {
+                bubbles: true,
+                cancelable: true,
+                view: window,
+                clientX: e.clientX,
+                clientY: e.clientY,
+                buttons: 0
+            });
+            wrapper.dispatchEvent(event);
+        }
+    };
+
+    useEffect(() => {
+        const element = ref.current;
+        if (!element) return;
+
+        const preventBrowserZoom = (e: WheelEvent) => {
+            if (e.ctrlKey) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        };
+
+        element.addEventListener('wheel', preventBrowserZoom, { passive: false });
+        return () => element.removeEventListener('wheel', preventBrowserZoom);
+    }, []);
+
     useLayoutEffect(() => {
         if (!ref.current) return;
-        const pxW = block.tightBoundingBox.width * containerRect.width;
-        const pxH = block.tightBoundingBox.height * containerRect.height;
+        const pxW = block.tightBoundingBox.width * containerWidth;
+        const pxH = block.tightBoundingBox.height * containerHeight;
 
         if (!isEditing) {
             const displayTxt = cleanPunctuation(block.text, settings.addSpaceOnMerge).replace(/\u200B/g, '\n');
             setFontSize(calculateFontSize(displayTxt, pxW + adj, pxH + adj, isVertical, settings));
         }
-    }, [block, containerRect, settings, isEditing, isVertical]);
+    }, [block, containerWidth, containerHeight, settings, isEditing, isVertical]);
 
     let displayContent = isEditing ? block.text : cleanPunctuation(block.text, settings.addSpaceOnMerge);
     displayContent = displayContent.replace(/\u200B/g, '\n');
@@ -170,7 +208,6 @@ export const TextBox: React.FC<{
         }
     }, [isActive, isEditing, settings.mobileMode, index, onUpdate, displayContent]);
 
-    // Helper to get correct Anki field from mapping settings
     const getTargetField = (type: 'Image' | 'Sentence') => {
         if (settings.ankiFieldMap) {
             const mapped = Object.keys(settings.ankiFieldMap).find(key => settings.ankiFieldMap![key] === type);
@@ -318,9 +355,14 @@ export const TextBox: React.FC<{
                 setMergeAnchor(null);
             }
         } else {
-            if (settings.mobileMode && (justActivated.current || !isActive)) {
-                if (!isActive) setIsActive(true);
-                return;
+            if (settings.mobileMode) {
+                if (!isActive) {
+                    setIsActive(true);
+                    return;
+                }
+                if (justActivated.current) {
+                    return;
+                }
             }
 
             if (!settings.enableYomitan) return;
@@ -328,12 +370,43 @@ export const TextBox: React.FC<{
             let charOffset = 0;
             let range: Range | null = null;
             
+            // FIX: Robust hit-testing to fix "Next Character" scanning issue.
             if (document.caretRangeFromPoint) {
                 range = document.caretRangeFromPoint(e.clientX, e.clientY);
-                if (range) charOffset = range.startOffset;
+                if (range && range.startContainer.nodeType === Node.TEXT_NODE) {
+                    charOffset = range.startOffset;
+                    
+                    // If caret is > 0, check if we clicked on the *previous* character
+                    if (charOffset > 0) {
+                        const checkRange = document.createRange();
+                        checkRange.setStart(range.startContainer, charOffset - 1);
+                        checkRange.setEnd(range.startContainer, charOffset);
+                        const rect = checkRange.getBoundingClientRect();
+                        
+                        // If click is inside the previous character's box, effectively select IT.
+                        if (e.clientX >= rect.left && e.clientX <= rect.right &&
+                            e.clientY >= rect.top && e.clientY <= rect.bottom) {
+                            charOffset -= 1;
+                        }
+                    }
+                }
             } else if ((document as any).caretPositionFromPoint) {
+                // Fallback for Firefox
                 const pos = (document as any).caretPositionFromPoint(e.clientX, e.clientY);
-                if (pos) charOffset = pos.offset;
+                if (pos && pos.offsetNode.nodeType === Node.TEXT_NODE) {
+                    charOffset = pos.offset;
+                    if (charOffset > 0) {
+                        const checkRange = document.createRange();
+                        checkRange.setStart(pos.offsetNode, charOffset - 1);
+                        checkRange.setEnd(pos.offsetNode, charOffset);
+                        const rect = checkRange.getBoundingClientRect();
+                        
+                        if (e.clientX >= rect.left && e.clientX <= rect.right &&
+                            e.clientY >= rect.top && e.clientY <= rect.bottom) {
+                            charOffset -= 1;
+                        }
+                    }
+                }
             }
 
             let content = cleanPunctuation(block.text, settings.addSpaceOnMerge);
@@ -392,6 +465,8 @@ export const TextBox: React.FC<{
 
     const classes = ['gemini-ocr-text-box', isVertical ? 'vertical' : '', isEditing ? 'editing' : '', isMergedTarget ? 'merge-target' : '', isActive ? 'mobile-active' : '', isLookingUp ? 'active-lookup' : ''].filter(Boolean).join(' ');
 
+    const shouldBeVisible = !settings.soloHoverMode || parentVisible || isLocalHover || isEditing || isActive || isLookingUp;
+
     return (
         <>
             <div
@@ -417,6 +492,12 @@ export const TextBox: React.FC<{
                 }}
                 onClick={handleInteract}
                 onTouchStart={handleTouchStart}
+                
+                onMouseEnter={() => setIsLocalHover(true)}
+                onMouseLeave={() => setIsLocalHover(false)}
+                
+                onMouseUp={handleMouseUpFix}
+
                 style={{
                     left: `calc(${block.tightBoundingBox.x * 100}% - ${adj / 2}px)`,
                     top: `calc(${block.tightBoundingBox.y * 100}% - ${adj / 2}px)`,
@@ -437,6 +518,9 @@ export const TextBox: React.FC<{
                     borderRadius: '3px',
                     
                     lineHeight: isVertical ? '1.5' : '1.1',
+                    
+                    opacity: shouldBeVisible ? 1 : 0,
+                    transition: 'opacity 0.2s',
                 }}
             >
                 {displayContent}
@@ -453,4 +537,4 @@ export const TextBox: React.FC<{
             )}
         </>
     );
-    };
+});

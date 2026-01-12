@@ -15,10 +15,12 @@ const STORAGE_KEY = 'mangatan_ocr_puck_pos';
 
 export const OCRManager = () => {
     const images = useMangaObserver(); 
-    // FIX: Destructure showDialog and showAlert here so they are available to use
     const { settings, setDictPopup, showDialog, showAlert } = useOCR();
     const [showSettings, setShowSettings] = useState(false);
-    const [refreshKey, setRefreshKey] = useState(0);
+    
+    // FIX: Removed 'refreshKey' state and resize listener.
+    // This stops the app from destroying/recreating overlays every time you scroll (URL bar resize).
+    // ImageOverlay now handles resizing internally via ResizeObserver.
 
     const [puckPos, setPuckPos] = useState<{x: number, y: number} | null>(null);
     const isDragging = useRef(false);
@@ -56,15 +58,12 @@ export const OCRManager = () => {
     // --- AUTO-UPDATE CHECK (Android Only) ---
     useEffect(() => {
         const check = async () => {
-            // Check if running on Android
             const isAndroid = /Android/i.test(navigator.userAgent);
             if (!isAndroid) return;
 
-            // Get Current Version & Variant (Browser vs Native)
             const info = await getAppVersion();
             if (!info || info.version === '0.0.0' || info.variant === 'unknown') return; 
 
-            // Check GitHub for the specific APK variant
             const update = await checkForUpdates(info.version, info.variant);
             
             if (update.hasUpdate) {
@@ -86,7 +85,6 @@ export const OCRManager = () => {
                             </p>
                         </div>
                     ),
-                    // Use @ts-ignore to bypass strict type check for custom props until types are updated
                     // @ts-ignore 
                     confirmText: 'Download',
                     cancelText: 'Cancel',
@@ -105,9 +103,8 @@ export const OCRManager = () => {
         };
         
         check();
-    }, [showDialog, showAlert]); // Dependencies added
+    }, [showDialog, showAlert]);
 
-    // URL Watcher (Reader Mode Toggle)
     useEffect(() => {
         const checkUrl = () => {
             const isReader = window.location.href.includes('/chapter/');
@@ -126,22 +123,23 @@ export const OCRManager = () => {
         };
     }, []);
 
-    // Resize Handler
+    // Resize Handler - Only adjust puck if it goes off screen
     useEffect(() => {
         const handleResize = () => {
-            setRefreshKey(prev => prev + 1);
             setPuckPos(prev => {
                 if (!prev) return null;
                 const maxX = window.innerWidth - PUCK_SIZE;
                 const maxY = window.innerHeight - PUCK_SIZE;
-                return { x: Math.min(prev.x, maxX), y: Math.min(prev.y, maxY) };
+                if (prev.x > maxX || prev.y > maxY) {
+                    return { x: Math.min(prev.x, maxX), y: Math.min(prev.y, maxY) };
+                }
+                return prev;
             });
         };
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Load Puck Position
     useEffect(() => {
         if (!settings.mobileMode) return;
         const loadPos = () => {
@@ -206,7 +204,7 @@ export const OCRManager = () => {
             <GlobalDialog />
             
             {images.map(img => (
-                <ImageOverlay key={`${img.src}-${refreshKey}`} img={img} spreadData={getSpreadData(img.src)} />
+                <ImageOverlay key={img.src} img={img} spreadData={getSpreadData(img.src)} />
             ))}
             
             <YomitanPopup />

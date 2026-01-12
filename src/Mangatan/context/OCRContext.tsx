@@ -53,13 +53,10 @@ export const OCRProvider = ({ children }: { children: ReactNode }) => {
         } catch (e) { console.error("Failed to load settings", e); }
         
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        const isiOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-        const isNative = navigator.userAgent.includes('MangatanNative');
         
         return { 
             ...DEFAULT_SETTINGS, 
             mobileMode: isMobile, 
-            enableYomitan: isiOS || isNative 
         };
     });
 
