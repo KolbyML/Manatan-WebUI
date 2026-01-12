@@ -7,7 +7,10 @@ import { TextBox } from '@/Mangatan/components/TextBox';
 import { StatusIcon } from '@/Mangatan/components/StatusIcon';
 import { useReaderOverlayStore } from '@/features/reader/stores/ReaderStore.ts';
 
-export const ImageOverlay: React.FC<{ img: HTMLImageElement }> = ({ img }) => {
+export const ImageOverlay: React.FC<{ 
+    img: HTMLImageElement;
+    spreadData?: { leftSrc: string; rightSrc: string } 
+}> = ({ img, spreadData }) => {
     const { settings, serverSettings, ocrCache, updateOcrData, setActiveImageSrc, mergeAnchor, ocrStatusMap, setOcrStatus, dictPopup } = useOCR();
     const [data, setData] = useState<OcrBlock[] | null>(null);
 
@@ -252,6 +255,7 @@ export const ImageOverlay: React.FC<{ img: HTMLImageElement }> = ({ img }) => {
                         index={i}
                         block={block}
                         imgSrc={img.src}
+                        spreadData={spreadData}
                         containerRect={rect}
                         onUpdate={handleUpdate}
                         onMerge={handleMerge}

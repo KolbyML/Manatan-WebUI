@@ -93,3 +93,67 @@ export async function getCroppedImg(
         return null;
     }
 }
+
+export async function getStitchedAndCroppedImg(
+    leftSrc: string,
+    rightSrc: string,
+    pixelCrop: Pixels,
+    quality: number
+): Promise<string | null> {
+    try {
+        const [imgL, imgR] = await Promise.all([
+            createImage(leftSrc),
+            createImage(rightSrc)
+        ]);
+        const canvas = new OffscreenCanvas(pixelCrop.width, pixelCrop.height);
+        const ctx = canvas.getContext('2d');
+
+        if (!ctx) {
+            console.error('Failed to get canvas context');
+            return null;
+        }
+
+        // Draw crop segment from left image
+        if (pixelCrop.x < imgL.naturalWidth) {
+            const sourceX = pixelCrop.x;
+            const sourceY = pixelCrop.y;
+            const drawWidth = Math.min(pixelCrop.width, imgL.naturalWidth - sourceX);
+            const drawHeight = pixelCrop.height;
+
+            ctx.drawImage(
+                imgL,
+                sourceX, sourceY, drawWidth, drawHeight,
+                0, 0, drawWidth, drawHeight
+            );
+        }
+        // Draw crop segment from right image
+        if (pixelCrop.x + pixelCrop.width > imgL.naturalWidth) {
+            const startInRight = Math.max(0, pixelCrop.x - imgL.naturalWidth);
+            const destX = Math.max(0, imgL.naturalWidth - pixelCrop.x);
+            const drawWidth = Math.min(pixelCrop.width - destX, imgR.naturalWidth - startInRight);
+            
+            ctx.drawImage(
+                imgR,
+                startInRight, pixelCrop.y, drawWidth, pixelCrop.height,
+                destX, 0, drawWidth, pixelCrop.height
+            );
+        }
+
+        // Convert to WebP blob
+        const blob = await canvas.convertToBlob({ 
+            type: 'image/webp',
+            quality: quality 
+        });
+
+        // Convert to base64
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+        });
+
+    } catch (error) {
+        console.error('Failed to crop image:', error);
+        return null;
+    }
+}

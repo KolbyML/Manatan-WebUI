@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useReaderSettingsStore, useReaderPagesStore } from '@/features/reader/stores/ReaderStore.ts';
 import { useMangaObserver } from './hooks/useMangaObserver';
 import { ImageOverlay } from './components/ImageOverlay';
 import { SettingsModal } from './components/SettingsModal';
@@ -7,6 +8,7 @@ import { YomitanPopup } from './components/YomitanPopup';
 import { useOCR } from './context/OCRContext';
 import { GlobalDialog } from './components/GlobalDialog';
 import { getAppVersion, checkForUpdates, triggerAppUpdate } from './utils/api';
+import { ReadingDirection, ReadingMode } from '@/features/reader/Reader.types.ts';
 
 const PUCK_SIZE = 50; 
 const STORAGE_KEY = 'mangatan_ocr_puck_pos';
@@ -22,6 +24,34 @@ export const OCRManager = () => {
     const isDragging = useRef(false);
     const dragStart = useRef({ x: 0, y: 0 });
     const initialPuckPos = useRef({ x: 0, y: 0 });
+
+    const pages = useReaderPagesStore((state) => state.pages.pages);
+    const { readingMode, readingDirection } = useReaderSettingsStore((state) => ({
+        readingMode: state.settings.readingMode.value,
+        readingDirection: state.settings.readingDirection.value
+    }));
+
+    const getSpreadData = (imgSrc: string) => {
+        if (!pages || pages.length === 0) return undefined;
+        if (readingMode !== ReadingMode.DOUBLE_PAGE) return undefined;
+
+        const page = pages.find(p =>
+            imgSrc.includes(p.primary.url) || (p.secondary && imgSrc.includes(p.secondary.url))
+        );
+
+        if (!page || !page.secondary) return undefined;
+
+        const p1 = page.primary; 
+        const p2 = page.secondary; 
+
+        const isRTL = readingDirection === ReadingDirection.RTL;
+
+        if (isRTL) {
+            return { leftSrc: p2.url, rightSrc: p1.url };
+        } else {
+            return { leftSrc: p1.url, rightSrc: p2.url };
+        }
+    };
 
     // --- AUTO-UPDATE CHECK (Android Only) ---
     useEffect(() => {
@@ -176,7 +206,7 @@ export const OCRManager = () => {
             <GlobalDialog />
             
             {images.map(img => (
-                <ImageOverlay key={`${img.src}-${refreshKey}`} img={img} />
+                <ImageOverlay key={`${img.src}-${refreshKey}`} img={img} spreadData={getSpreadData(img.src)} />
             ))}
             
             <YomitanPopup />

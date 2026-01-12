@@ -72,6 +72,7 @@ export interface DictionaryDefinition {
 
 export interface DictPopupContext {
     imgSrc: string;
+    spreadData?: { leftSrc: string; rightSrc: string }; 
     sentence: string;
 }
 
