@@ -318,6 +318,7 @@ const AnkiButtons: React.FC<{
             {showCropper && createPortal(
                 <CropperModal 
                     imageSrc={dictPopup.context?.imgSrc || ''}
+                    spreadData={dictPopup.context?.spreadData}
                     onComplete={(b64) => {
                         setShowCropper(false);
                         addNoteToAnki(b64);

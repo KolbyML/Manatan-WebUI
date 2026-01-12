@@ -351,7 +351,7 @@ export const TextBox: React.FC<{
                 isLoading: true,
                 systemLoading: false,
                 highlight: undefined,
-                context: { imgSrc, sentence: content }
+                context: { imgSrc, sentence: content, spreadData }
             });
 
             const results = await lookupYomitan(content, byteIndex);
