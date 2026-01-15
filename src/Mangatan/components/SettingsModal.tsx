@@ -616,7 +616,7 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                     <h3>Interaction</h3>
                     <div className="grid">
                         <label htmlFor="interactMode">Mode</label>
-                        <select id="interactMode" value={localSettings.interactionMode} onChange={(e) => handleChange('interactMode', e.target.value)}>
+                        <select id="interactMode" value={localSettings.interactionMode} onChange={(e) => handleChange('interactionMode', e.target.value)}>
                             <option value="hover">Hover</option><option value="click">Click</option>
                         </select>
                         <label htmlFor="delKey">Delete Key</label>
