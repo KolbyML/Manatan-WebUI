@@ -427,7 +427,8 @@ export const TextBox: React.FC<{
                 context: { imgSrc, sentence: content, spreadData }
             });
 
-            const results = await lookupYomitan(content, byteIndex);
+            // Pass the resultGroupingMode setting here
+            const results = await lookupYomitan(content, byteIndex, settings.resultGroupingMode);
 
             if (results === 'loading') {
                  setDictPopup(prev => ({ ...prev, results: [], isLoading: false, systemLoading: true }));

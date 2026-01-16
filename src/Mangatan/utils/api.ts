@@ -112,9 +112,15 @@ export const apiRequest = async <T>(
 
 // --- YOMITAN API ---
 
-export const lookupYomitan = async (text: string, index: number = 0): Promise<DictionaryResult[] | 'loading'> => {
+export const lookupYomitan = async (
+    text: string, 
+    index: number = 0, 
+    groupingMode: 'grouped' | 'flat' = 'grouped'
+): Promise<DictionaryResult[] | 'loading'> => {
     try {
-        const url = `/api/yomitan/lookup?text=${encodeURIComponent(text)}&index=${index}`;
+        // Convert dropdown value to backend boolean
+        const groupParam = groupingMode === 'grouped';
+        const url = `/api/yomitan/lookup?text=${encodeURIComponent(text)}&index=${index}&group=${groupParam}`;
         const res = await apiRequest<any>(url);
         
         if (res && res.error === 'loading') return 'loading';

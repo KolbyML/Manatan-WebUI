@@ -46,6 +46,9 @@ export interface Settings {
     ankiModel?: string;
     ankiFieldMap?: Record<string, string>;
     ankiCheckDuplicates?: boolean;
+    // Dropdown setting for grouping behavior
+    resultGroupingMode: 'grouped' | 'flat'; 
+
 }
 
 export type MergeState = { imgSrc: string; index: number; } | null;
@@ -128,6 +131,8 @@ export const DEFAULT_SETTINGS: Settings = {
     addSpaceOnMerge: false,
     disableStatusIcon: false,
     enableYomitan: ENABLE_YOMITAN_DEFAULT,
+    // Default to grouped
+    resultGroupingMode: 'grouped', 
     deleteModifierKey: 'Alt',
     mergeModifierKey: 'Control',
     site: {
@@ -162,4 +167,3 @@ export const COLOR_THEMES: Record<ColorTheme, { accent: string; background: stri
     white: { accent: '#333333', background: '#ffffff' },
     dark: { accent: '#555555', background: '#1a1d21' },
 };
-

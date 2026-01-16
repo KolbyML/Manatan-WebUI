@@ -352,6 +352,20 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                             transition: 'max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-in-out',
                         }}>
                              <div style={{ paddingTop: '15px' }}>
+                                 {/* Result Grouping Dropdown */}
+                                 <div style={{ marginBottom: '15px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                    <label htmlFor="groupingMode" style={{fontSize: '0.9em', color: '#ccc'}}>Result Grouping</label>
+                                    <select
+                                        id="groupingMode"
+                                        value={localSettings.resultGroupingMode || 'grouped'}
+                                        onChange={(e) => handleChange('resultGroupingMode', e.target.value)}
+                                        style={{ padding: '6px', borderRadius: '4px', border: '1px solid #444', background: '#222', color: 'white' }}
+                                    >
+                                        <option value="grouped">Group by Word (Default)</option>
+                                        <option value="flat">No Grouping (Flat)</option>
+                                    </select>
+                                 </div>
+
                                 {isInstalling && (
                                     <div style={{ fontSize: '0.9em', color: '#aaa', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                         <div style={{
