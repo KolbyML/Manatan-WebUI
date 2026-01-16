@@ -361,8 +361,8 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                                         onChange={(e) => handleChange('resultGroupingMode', e.target.value)}
                                         style={{ padding: '6px', borderRadius: '4px', border: '1px solid #444', background: '#222', color: 'white' }}
                                     >
-                                        <option value="grouped">Group by Word (Default)</option>
-                                        <option value="flat">No Grouping (Flat)</option>
+                                        <option value="grouped">Group by Term</option>
+                                        <option value="flat">No Grouping</option>
                                     </select>
                                  </div>
 
