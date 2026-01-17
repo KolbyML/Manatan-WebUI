@@ -28,8 +28,15 @@ const ContentNode: React.FC<{ node: any }> = ({ node }) => {
     const { tag, content, style, href } = node;
     const s = style || {};
 
-    const tableStyle: React.CSSProperties = { borderCollapse: 'collapse', border: '1px solid #777', margin: '4px 0', fontSize: '0.9em', backgroundColor: '#fff', color: '#000' };
     const cellStyle: React.CSSProperties = { border: '1px solid #777', padding: '2px 8px', textAlign: 'center' };
+    const tableStyle: React.CSSProperties = { 
+        borderCollapse: 'collapse', 
+        border: '1px solid #555', 
+        margin: '4px 0', 
+        fontSize: '0.9em', 
+        width: '100%' 
+    };
+    
     const listStyle: React.CSSProperties = { paddingLeft: '20px', margin: '2px 0', listStyleType: 'disc' };
 
     switch (tag) {
@@ -155,12 +162,12 @@ const AnkiButtons: React.FC<{
             }
             if (tag === 'li') return `<li style="${customStyle}">${generateHTML(content)}</li>`;
             if (tag === 'table') {
-                baseStyle = 'border-collapse: collapse; border: 1px solid #777; margin: 4px 0; font-size: 0.9em; background-color: #fff; color: #000; width: 100%;';
+                baseStyle = 'border-collapse: collapse; border: 1px solid #777; margin: 4px 0; font-size: 0.9em; width: 100%;';
                 return `<table style="${baseStyle}${customStyle}"><tbody>${generateHTML(content)}</tbody></table>`;
             }
             if (tag === 'tr') return `<tr style="${customStyle}">${generateHTML(content)}</tr>`;
             if (tag === 'th') {
-                baseStyle = 'border: 1px solid #777; padding: 2px 8px; text-align: center; background-color: #eee; font-weight: bold;';
+                baseStyle = 'border: 1px solid #777; padding: 2px 8px; text-align: center; font-weight: bold;';
                 return `<th style="${baseStyle}${customStyle}">${generateHTML(content)}</th>`;
             }
             if (tag === 'td') {
@@ -170,7 +177,7 @@ const AnkiButtons: React.FC<{
             if (tag === 'span') return `<span style="${customStyle}">${generateHTML(content)}</span>`;
             if (tag === 'div') return `<div style="${customStyle}">${generateHTML(content)}</div>`;
             if (tag === 'a') {
-                baseStyle = 'color: #4890ff; text-decoration: underline;';
+                baseStyle = 'text-decoration: underline;'; 
                 return `<a href="${href}" target="_blank" style="${baseStyle}${customStyle}">${generateHTML(content)}</a>`;
             }
             
@@ -225,10 +232,10 @@ const AnkiButtons: React.FC<{
 
             return `
                 <div style="margin-bottom: 12px; display: flex;">
-                    <div style="flex-shrink: 0; width: 24px; color: #888; font-weight: bold;">${idx + 1}.</div>
+                    <div style="flex-shrink: 0; width: 24px; font-weight: bold;">${idx + 1}.</div>
                     <div style="flex-grow: 1;">
                         <div style="margin-bottom: 4px;">${tagsHTML}${dictHTML}</div>
-                        <div style="color: #ddd;">${contentHTML}</div>
+                        <div>${contentHTML}</div>
                     </div>
                 </div>
             `;
