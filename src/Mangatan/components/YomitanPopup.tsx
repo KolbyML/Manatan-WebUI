@@ -237,6 +237,11 @@ const AnkiButtons: React.FC<{
         // Collect all tags from all definitions
         const allTags = new Set(['mangatan']);
         entry.definitions.forEach(def => def.tags.forEach(t => allTags.add(t)));
+        // Safely add termTags by checking if they are strings or objects
+        entry.termTags?.forEach((t: any) => {
+            if (typeof t === 'string') allTags.add(t);
+            else if (t && typeof t === 'object' && t.name) allTags.add(t.name);
+        });
 
         // Populate Fields
         for (const [ankiField, mapType] of Object.entries(map)) {
@@ -449,22 +454,39 @@ export const YomitanPopup = () => {
 
                 {!dictPopup.isLoading && dictPopup.results.map((entry, i) => (
                     <div key={i} style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: i < dictPopup.results.length - 1 ? '1px solid #333' : 'none' }}>
-                        {/* --- HEADER: WORD + ANKI BUTTON --- */}
+                        {/* --- HEADER: WORD + TERM TAGS + ANKI BUTTON --- */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                            <div style={{ fontSize: '1.8em', lineHeight: '1' }}>
-                                {entry.furigana && entry.furigana.length > 0 ? (
-                                    <ruby style={{ rubyPosition: 'over' }}>
-                                        {entry.furigana.map((seg, idx) => (
-                                            <React.Fragment key={idx}>
-                                                {seg[0]}<rt style={{ fontSize: '0.5em', color: '#aaa' }}>{seg[1]}</rt>
-                                            </React.Fragment>
-                                        ))}
-                                    </ruby>
-                                ) : (
-                                    <ruby>
-                                        {entry.headword}
-                                        <rt style={{ fontSize: '0.5em', color: '#aaa' }}>{entry.reading}</rt>
-                                    </ruby>
+                            <div style={{ display: 'flex', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                                <div style={{ fontSize: '1.8em', lineHeight: '1', marginRight: '10px' }}>
+                                    {entry.furigana && entry.furigana.length > 0 ? (
+                                        <ruby style={{ rubyPosition: 'over' }}>
+                                            {entry.furigana.map((seg, idx) => (
+                                                <React.Fragment key={idx}>
+                                                    {seg[0]}<rt style={{ fontSize: '0.5em', color: '#aaa' }}>{seg[1]}</rt>
+                                                </React.Fragment>
+                                            ))}
+                                        </ruby>
+                                    ) : (
+                                        <ruby>
+                                            {entry.headword}
+                                            <rt style={{ fontSize: '0.5em', color: '#aaa' }}>{entry.reading}</rt>
+                                        </ruby>
+                                    )}
+                                </div>
+                                {entry.termTags && entry.termTags.length > 0 && (
+                                    <div style={{ display: 'flex', gap: '4px' }}>
+                                        {entry.termTags.map((tag: any, idx) => {
+                                            const label = (typeof tag === 'object' && tag !== null && tag.name) 
+                                                ? tag.name 
+                                                : tag;
+                                                
+                                            return (
+                                                <span key={idx} style={{ ...tagStyle, backgroundColor: '#666', marginRight: 0 }}>
+                                                    {String(label)}
+                                                </span>
+                                            );
+                                        })}
+                                    </div>
                                 )}
                             </div>
                             

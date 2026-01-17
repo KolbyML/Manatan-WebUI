@@ -65,6 +65,9 @@ export interface DictionaryResult {
     forms?: { headword: string; reading: string }[];
     source?: number;
     matchLen?: number; 
+    termTags?: string[];
+    frequencies?: any[];
+
 }
 
 export interface DictionaryDefinition {
