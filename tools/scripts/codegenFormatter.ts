@@ -42,7 +42,7 @@ const addImports = format(
     `import {FieldPolicy, FieldReadFunction, Reference, TypePolicies, TypePolicy} from '@apollo/client/cache';
 import {
 \tGetChaptersMangaQuery, GetDownloadStatusQueryVariables, GetGlobalMetadataQueryVariables,
-\tGetMangaScreenQueryVariables, GetSourceBrowseQueryVariables, GetUpdateStatusQueryVariables, GetWebuiUpdateStatusQueryVariables,
+\tGetMangaScreenQueryVariables, GetSourceBrowseQueryVariables, GetUpdateStatusQueryVariables,
 } from "@/lib/graphql/generated/graphql.ts";
 import {FieldFunctionOptions} from "@apollo/client/cache/inmemory/policies";`,
 );
@@ -51,17 +51,14 @@ const fixTypingOfQueryTypePolicies = format(
     addImports,
     `export type QueryFieldPolicy = {
 \taboutServer?: FieldPolicy<any> | FieldReadFunction<any>,
-\taboutWebUI?: FieldPolicy<any> | FieldReadFunction<any>,
 \tcategories?: FieldPolicy<any> | FieldReadFunction<any>,
 \tcategory?: FieldPolicy<any> | FieldReadFunction<any>,
 \tchapter?: FieldPolicy<any> | FieldReadFunction<any>,
 \tchapters?: FieldPolicy<any> | FieldReadFunction<any>,
 \tcheckForServerUpdates?: FieldPolicy<any> | FieldReadFunction<any>,
-\tcheckForWebUIUpdate?: FieldPolicy<any> | FieldReadFunction<any>,
 \tdownloadStatus?: FieldPolicy<any> | FieldReadFunction<any>,
 \textension?: FieldPolicy<any> | FieldReadFunction<any>,
 \textensions?: FieldPolicy<any> | FieldReadFunction<any>,
-\tgetWebUIUpdateStatus?: FieldPolicy<any> | FieldReadFunction<any>,
 \tkoSyncStatus?: FieldPolicy<any> | FieldReadFunction<any>,
 \tlastUpdateTimestamp?: FieldPolicy<any> | FieldReadFunction<any>,
 \tlibraryUpdateStatus?: FieldPolicy<any> | FieldReadFunction<any>,
@@ -83,17 +80,14 @@ const fixTypingOfQueryTypePolicies = format(
 };`,
     `export type QueryFieldPolicy = {
 \taboutServer?: FieldPolicy<any> | FieldReadFunction<any>,
-\taboutWebUI?: FieldPolicy<any> | FieldReadFunction<any>,
 \tcategories?: FieldPolicy<any> | FieldReadFunction<any>,
 \tcategory?: FieldPolicy<any> | FieldReadFunction<any>,
 \tchapter?: FieldPolicy<any> | FieldReadFunction<any>,
 \tchapters?: FieldPolicy<GetChaptersMangaQuery['chapters']> | FieldReadFunction<GetChaptersMangaQuery['chapters']>,
 \tcheckForServerUpdates?: FieldPolicy<any> | FieldReadFunction<any>,
-\tcheckForWebUIUpdate?: FieldPolicy<any> | FieldReadFunction<any>,
 \tdownloadStatus?: FieldPolicy<Reference, Reference, Reference, FieldFunctionOptions<GetDownloadStatusQueryVariables>> | FieldReadFunction<Reference, Reference, FieldFunctionOptions<GetDownloadStatusQueryVariables>>,
 \textension?: FieldPolicy<any> | FieldReadFunction<any>,
 \textensions?: FieldPolicy<any> | FieldReadFunction<any>,
-\tgetWebUIUpdateStatus?: FieldPolicy<Reference, Reference, Reference, FieldFunctionOptions<GetWebuiUpdateStatusQueryVariables>> | FieldReadFunction<Reference, Reference, FieldFunctionOptions<GetWebuiUpdateStatusQueryVariables>>,
 \tkoSyncStatus?: FieldPolicy<any> | FieldReadFunction<any>,
 \tlastUpdateTimestamp?: FieldPolicy<any> | FieldReadFunction<any>,
 \tlibraryUpdateStatus?: FieldPolicy<Reference, Reference, Reference, FieldFunctionOptions<GetUpdateStatusQueryVariables>> | FieldReadFunction<Reference, Reference, FieldFunctionOptions<GetUpdateStatusQueryVariables>>,

@@ -16,7 +16,6 @@ import { AwaitableComponent } from 'awaitable-component';
 import { AppContext } from '@/base/contexts/AppContext.tsx';
 import { DefaultNavBar } from '@/features/navigation-bar/components/DefaultNavBar.tsx';
 import { requestManager } from '@/lib/requests/RequestManager.ts';
-import { ServerUpdateChecker } from '@/features/app-updates/components/ServerUpdateChecker.tsx';
 import { lazyLoadFallback } from '@/base/utils/LazyLoad.tsx';
 import { ErrorBoundary } from '@/base/components/feedback/ErrorBoundary.tsx';
 import { useNavBarContext } from '@/features/navigation-bar/NavbarContext.tsx';
@@ -71,7 +70,6 @@ const { ImageProcessingSetting } = loadable(
 );
 const { ServerSettings } = loadable(() => import('@/features/settings/screens/ServerSettings.tsx'), lazyLoadFallback);
 const { BrowseSettings } = loadable(() => import('@/features/browse/screens/BrowseSettings.tsx'), lazyLoadFallback);
-const { WebUISettings } = loadable(() => import('@/features/settings/screens/WebUISettings.tsx'), lazyLoadFallback);
 const { Migrate } = loadable(() => import('@/features/migration/screens/Migrate.tsx'), lazyLoadFallback);
 const { DeviceSetting } = loadable(() => import('@/features/device/screens/DeviceSetting.tsx'), lazyLoadFallback);
 const { TrackingSettings } = loadable(
@@ -139,7 +137,6 @@ const BackgroundSubscriptions = () => {
 
     requestManager.useDownloadSubscription({ skip: skipConnection });
     requestManager.useUpdaterSubscription({ skip: skipConnection });
-    requestManager.useWebUIUpdateSubscription({ skip: skipConnection });
 
     return null;
 };
@@ -259,7 +256,6 @@ const MainApp = () => {
                             </Route>
                             <Route path={AppRoutes.settings.childRoutes.backup.match} element={<Backup />} />
                             <Route path={AppRoutes.settings.childRoutes.server.match} element={<ServerSettings />} />
-                            <Route path={AppRoutes.settings.childRoutes.webui.match} element={<WebUISettings />} />
                             <Route path={AppRoutes.settings.childRoutes.browse.match} element={<BrowseSettings />} />
                             <Route path={AppRoutes.settings.childRoutes.history.match} element={<HistorySettings />} />
                             <Route path={AppRoutes.settings.childRoutes.device.match} element={<DeviceSetting />} />

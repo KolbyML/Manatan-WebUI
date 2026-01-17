@@ -37,8 +37,6 @@ import {
     ChapterOrderBy,
     CheckForServerUpdatesQuery,
     CheckForServerUpdatesQueryVariables,
-    CheckForWebuiUpdateQuery,
-    CheckForWebuiUpdateQueryVariables,
     ClearCachedImagesInput,
     ClearDownloaderMutation,
     ClearDownloaderMutationVariables,
@@ -127,14 +125,10 @@ import {
     GetSourcesListQueryVariables,
     GetUpdateStatusQuery,
     GetUpdateStatusQueryVariables,
-    GetWebuiUpdateStatusQuery,
-    GetWebuiUpdateStatusQueryVariables,
     InstallExternalExtensionMutation,
     InstallExternalExtensionMutationVariables,
     ReorderChapterDownloadMutation,
     ReorderChapterDownloadMutationVariables,
-    ResetWebuiUpdateStatusMutation,
-    ResetWebuiUpdateStatusMutationVariables,
     RestoreBackupMutation,
     RestoreBackupMutationVariables,
     SetCategoryMetadataMutation,
@@ -204,11 +198,8 @@ import {
     UpdateSourcePreferencesMutation,
     UpdateSourcePreferencesMutationVariables,
     UpdateTrackInput,
-    UpdateWebuiMutation,
-    UpdateWebuiMutationVariables,
     ValidateBackupQuery,
     ValidateBackupQueryVariables,
-    WebuiUpdateSubscription,
     UpdateLibraryMutation,
     UpdateLibraryMutationVariables,
     GetExtensionQuery,
@@ -233,9 +224,7 @@ import { GET_GLOBAL_METADATAS } from '@/lib/graphql/metadata/GlobalMetadataQuery
 import { DELETE_GLOBAL_METADATA, SET_GLOBAL_METADATA } from '@/lib/graphql/metadata/GlobalMetadataMutation.ts';
 import {
     CHECK_FOR_SERVER_UPDATES,
-    CHECK_FOR_WEBUI_UPDATE,
     GET_ABOUT,
-    GET_WEBUI_UPDATE_STATUS,
 } from '@/lib/graphql/server/ServerInfoQuery.ts';
 import { GET_EXTENSION, GET_EXTENSIONS } from '@/lib/graphql/extension/ExtensionQuery.ts';
 import {
@@ -317,8 +306,6 @@ import { UPDATER_SUBSCRIPTION } from '@/lib/graphql/updater/UpdaterSubscription.
 import { GET_SERVER_SETTINGS } from '@/lib/graphql/settings/SettingsQuery.ts';
 import { UPDATE_SERVER_SETTINGS } from '@/lib/graphql/settings/SettingsMutation.ts';
 import { CLEAR_SERVER_CACHE } from '@/lib/graphql/image/ImageMutation.ts';
-import { RESET_WEBUI_UPDATE_STATUS, UPDATE_WEBUI } from '@/lib/graphql/server/ServerInfoMutation.ts';
-import { WEBUI_UPDATE_SUBSCRIPTION } from '@/lib/graphql/server/ServerInfoSubscription.ts';
 import { GET_DOWNLOAD_STATUS } from '@/lib/graphql/download/DownloaderQuery.ts';
 import { defaultPromiseErrorHandler } from '@/lib/DefaultPromiseErrorHandler.ts';
 import { QueuePriority } from '@/lib/Queue.ts';
@@ -1385,18 +1372,6 @@ export class RequestManager {
         options?: QueryHookOptions<CheckForServerUpdatesQuery, CheckForServerUpdatesQueryVariables>,
     ): AbortableApolloUseQueryResponse<CheckForServerUpdatesQuery, CheckForServerUpdatesQueryVariables> {
         return this.doRequest(GQLMethod.USE_QUERY, CHECK_FOR_SERVER_UPDATES, {}, options);
-    }
-
-    public useCheckForWebUIUpdate(
-        options?: QueryHookOptions<CheckForWebuiUpdateQuery, CheckForWebuiUpdateQueryVariables>,
-    ): AbortableApolloUseQueryResponse<CheckForWebuiUpdateQuery, CheckForWebuiUpdateQueryVariables> {
-        return this.doRequest(GQLMethod.USE_QUERY, CHECK_FOR_WEBUI_UPDATE, {}, options);
-    }
-
-    public updateWebUI(
-        options?: MutationOptions<UpdateWebuiMutation, UpdateWebuiMutationVariables>,
-    ): AbortableApolloMutationResponse<UpdateWebuiMutation> {
-        return this.doRequest(GQLMethod.MUTATION, UPDATE_WEBUI, undefined, options);
     }
 
     public useGetExtension(
@@ -3244,24 +3219,6 @@ export class RequestManager {
         options?: MutationHookOptions<ClearServerCacheMutation, ClearServerCacheMutationVariables>,
     ): AbortableApolloUseMutationResponse<ClearServerCacheMutation, ClearServerCacheMutationVariables> {
         return this.doRequest(GQLMethod.USE_MUTATION, CLEAR_SERVER_CACHE, { input }, options);
-    }
-
-    public useWebUIUpdateSubscription(
-        options?: SubscriptionHookOptions<WebuiUpdateSubscription, WebuiUpdateSubscription>,
-    ): SubscriptionResult<WebuiUpdateSubscription, WebuiUpdateSubscription> {
-        return this.doRequest(GQLMethod.USE_SUBSCRIPTION, WEBUI_UPDATE_SUBSCRIPTION, undefined, options);
-    }
-
-    public resetWebUIUpdateStatus(
-        options?: MutationOptions<ResetWebuiUpdateStatusMutation, ResetWebuiUpdateStatusMutationVariables>,
-    ): AbortableApolloMutationResponse<ResetWebuiUpdateStatusMutation> {
-        return this.doRequest(GQLMethod.MUTATION, RESET_WEBUI_UPDATE_STATUS, undefined, options);
-    }
-
-    public useGetWebUIUpdateStatus(
-        options?: QueryHookOptions<GetWebuiUpdateStatusQuery, GetWebuiUpdateStatusQueryVariables>,
-    ): AbortableApolloUseQueryResponse<GetWebuiUpdateStatusQuery, GetWebuiUpdateStatusQueryVariables> {
-        return this.doRequest(GQLMethod.USE_QUERY, GET_WEBUI_UPDATE_STATUS, undefined, options);
     }
 
     public useGetMigratableSources(

@@ -124,12 +124,6 @@ const typePolicies: StrictTypedTypePolicies = {
                     return incoming;
                 },
             },
-            getWebUIUpdateStatus(_, { toReference }) {
-                return toReference({
-                    __typename: 'WebUIUpdateStatus',
-                    key: {},
-                });
-            },
             updateStatus(_, { toReference }) {
                 return toReference({ __typename: 'UpdateStatus', key: {} });
             },

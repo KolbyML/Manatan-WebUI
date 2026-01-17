@@ -1845,17 +1845,14 @@ export type PushKoSyncProgressPayload = {
 export type Query = {
   __typename?: 'Query';
   aboutServer: AboutServerPayload;
-  aboutWebUI: AboutWebUi;
   categories: CategoryNodeList;
   category: CategoryType;
   chapter: ChapterType;
   chapters: ChapterNodeList;
   checkForServerUpdates: Array<CheckForServerUpdatesPayload>;
-  checkForWebUIUpdate: WebUiUpdateCheck;
   downloadStatus: DownloadStatus;
   extension: ExtensionType;
   extensions: ExtensionNodeList;
-  getWebUIUpdateStatus: WebUiUpdateStatus;
   koSyncStatus: KoSyncStatusPayload;
   lastUpdateTimestamp: LastUpdateTimestampPayload;
   libraryUpdateStatus: LibraryUpdateStatus;
@@ -3909,22 +3906,12 @@ export type ResetWebuiUpdateStatusMutation = { __typename?: 'Mutation', resetWeb
 export type GetAboutQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetAboutQuery = { __typename?: 'Query', aboutServer: { __typename?: 'AboutServerPayload', buildTime: string, buildType: string, discord: string, github: string, name: string, version: string }, aboutWebUI: { __typename?: 'AboutWebUI', channel: WebUiChannel, tag: string, updateTimestamp: string } };
+export type GetAboutQuery = { __typename?: 'Query', aboutServer: { __typename?: 'AboutServerPayload', buildTime: string, buildType: string, discord: string, github: string, name: string, version: string } };
 
 export type CheckForServerUpdatesQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type CheckForServerUpdatesQuery = { __typename?: 'Query', checkForServerUpdates: Array<{ __typename?: 'CheckForServerUpdatesPayload', channel: string, tag: string, url: string }> };
-
-export type CheckForWebuiUpdateQueryVariables = Exact<{ [key: string]: never; }>;
-
-
-export type CheckForWebuiUpdateQuery = { __typename?: 'Query', checkForWebUIUpdate: { __typename?: 'WebUIUpdateCheck', channel: WebUiChannel, tag: string, updateAvailable: boolean } };
-
-export type GetWebuiUpdateStatusQueryVariables = Exact<{ [key: string]: never; }>;
-
-
-export type GetWebuiUpdateStatusQuery = { __typename?: 'Query', getWebUIUpdateStatus: { __typename?: 'WebUIUpdateStatus', progress: number, state: UpdateState, info: { __typename?: 'WebUIUpdateInfo', channel: WebUiChannel, tag: string } } };
 
 export type WebuiUpdateSubscriptionVariables = Exact<{ [key: string]: never; }>;
 

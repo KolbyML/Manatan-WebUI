@@ -50,7 +50,7 @@ export function About() {
         );
     }
 
-    const { aboutServer, aboutWebUI } = data!;
+    const { aboutServer } = data!;
     const selectedServerChannelInfo = serverUpdateCheckData?.checkForServerUpdates?.find(
         (channel) => channel.channel === aboutServer.buildType,
     );
@@ -108,7 +108,7 @@ export function About() {
                 <ListItem>
                     <ListItemText
                         primary={t('settings.about.webui.label.channel')}
-                        secondary={aboutWebUI.channel.toLocaleUpperCase()}
+                        secondary="BUNDLED"
                     />
                 </ListItem>
                 <ListItem>

@@ -42,16 +42,6 @@ export interface ISearchSettings {
 
 export type ServerSettings = Omit<GetServerSettingsQuery['settings'], '__typename'>;
 
-export type WebUISettingsType = Pick<
-    ServerSettings,
-    | 'webUIFlavor'
-    | 'initialOpenInBrowserEnabled'
-    | 'webUIInterface'
-    | 'electronPath'
-    | 'webUIChannel'
-    | 'webUIUpdateCheckInterval'
->;
-
 export type GlobalUpdateSkipEntriesSettings = Pick<
     ServerSettings,
     'excludeUnreadChapters' | 'excludeNotStarted' | 'excludeCompleted'

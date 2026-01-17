@@ -15,7 +15,6 @@ import { useTranslation } from 'react-i18next';
 import CollectionsOutlinedBookmarkIcon from '@mui/icons-material/CollectionsBookmarkOutlined';
 import GetAppOutlinedIcon from '@mui/icons-material/GetAppOutlined';
 import DnsIcon from '@mui/icons-material/Dns';
-import WebIcon from '@mui/icons-material/Web';
 import ExploreOutlinedIcon from '@mui/icons-material/ExploreOutlined';
 import DevicesIcon from '@mui/icons-material/Devices';
 import SyncIcon from '@mui/icons-material/Sync';
@@ -93,12 +92,6 @@ export function Settings() {
                     <DevicesIcon />
                 </ListItemIcon>
                 <ListItemText primary={t('settings.device.title.device')} />
-            </ListItemLink>
-            <ListItemLink to={AppRoutes.settings.childRoutes.webui.path}>
-                <ListItemIcon>
-                    <WebIcon />
-                </ListItemIcon>
-                <ListItemText primary={t('settings.webui.title.webui')} />
             </ListItemLink>
             <ListItemLink to={AppRoutes.settings.childRoutes.server.path}>
                 <ListItemIcon>
