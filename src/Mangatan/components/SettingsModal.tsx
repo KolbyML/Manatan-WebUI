@@ -31,8 +31,7 @@ const statusDotStyle = (connected: boolean): React.CSSProperties => ({
     boxShadow: connected ? '0 0 5px #2ecc71' : 'none'
 });
 
-const MAPPING_OPTIONS = ['None', 'Sentence', 'Image', 'Furigana', 'Reading', 'Target Word', 'Definition'];
-
+const MAPPING_OPTIONS = ['None', 'Sentence', 'Image', 'Furigana', 'Reading', 'Target Word', 'Definition', 'Frequency'];
 export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const { settings, setSettings, showConfirm, showAlert, showProgress, closeDialog, showDialog } = useOCR();
     const [localSettings, setLocalSettings] = useState(settings);

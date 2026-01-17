@@ -192,8 +192,21 @@ const AnkiButtons: React.FC<{
             }).join('');
         };
 
+        const getLowestFrequency = (): string => {
+            if (!entry.frequencies || entry.frequencies.length === 0) return '';
+            
+            const numbers = entry.frequencies
+                .map(f => {
+                    // Extract numeric part from string like "12345" or "12,345"
+                    const cleaned = f.value.replace(/[^\d]/g, '');
+                    return parseInt(cleaned, 10);
+                })
+                .filter(n => !isNaN(n));
+            
+            if (numbers.length === 0) return '';
+            return Math.min(...numbers).toString();
+        };
 
-        // --- BUILD DEFINITION FIELD HTML ---
         const definitionHTML = entry.definitions.map((def, idx) => {
             const tagsHTML = def.tags.map(t => 
                 `<span style="display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 0.75em; font-weight: bold; margin-right: 6px; color: #fff; background-color: #666; vertical-align: middle;">${t}</span>`
@@ -231,6 +244,7 @@ const AnkiButtons: React.FC<{
             else if (mapType === 'Reading') fields[ankiField] = entry.reading;
             else if (mapType === 'Furigana') fields[ankiField] = generateAnkiFurigana(entry.furigana || []);
             else if (mapType === 'Definition') fields[ankiField] = definitionHTML;
+            else if (mapType === 'Frequency') fields[ankiField] = getLowestFrequency();
             else if (mapType === 'Sentence') fields[ankiField] = dictPopup.context?.sentence || '';
         }
 
@@ -457,6 +471,39 @@ export const YomitanPopup = () => {
                             {settings.ankiConnectEnabled && <AnkiButtons entry={entry} />}
                         </div>
 
+                        {/* --- FREQUENCIES --- */}
+                        {entry.frequencies && entry.frequencies.length > 0 && (
+                            <div style={{ marginBottom: '10px', display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                                {entry.frequencies.map((freq, fIdx) => (
+                                    <div key={fIdx} style={{ 
+                                        display: 'inline-flex', 
+                                        fontSize: '0.75em', 
+                                        borderRadius: '4px', 
+                                        overflow: 'hidden', 
+                                        border: '1px solid rgba(255,255,255,0.2)' 
+                                    }}>
+                                        <div style={{ 
+                                            backgroundColor: '#2ecc71', 
+                                            color: '#000', 
+                                            fontWeight: 'bold', 
+                                            padding: '2px 6px' 
+                                        }}>
+                                            {freq.dictionaryName}
+                                        </div>
+                                        <div style={{ 
+                                            backgroundColor: '#333', 
+                                            color: '#eee', 
+                                            padding: '2px 6px',
+                                            fontWeight: 'bold'
+                                        }}>
+                                            {freq.value}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* --- DEFINITIONS --- */}
                         {entry.definitions && (
                             <div>
                                 {entry.definitions.map((def, defIdx) => (
