@@ -6,6 +6,11 @@ interface OCRContextType {
     settings: Settings;
     setSettings: React.Dispatch<React.SetStateAction<Settings>>;
     serverSettings: ServerSettingsData | null;
+    // Settings UI State
+    isSettingsOpen: boolean;
+    openSettings: () => void;
+    closeSettings: () => void;
+
     ocrCache: Map<string, OcrBlock[]>;
     updateOcrData: (imgSrc: string, data: OcrBlock[]) => void;
     ocrStatusMap: Map<string, OcrStatus>;
@@ -59,6 +64,10 @@ export const OCRProvider = ({ children }: { children: ReactNode }) => {
             mobileMode: isMobile, 
         };
     });
+
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const openSettings = useCallback(() => setIsSettingsOpen(true), []);
+    const closeSettings = useCallback(() => setIsSettingsOpen(false), []);
 
     const [ocrCache, setOcrCache] = useState<Map<string, OcrBlock[]>>(new Map());
     const [ocrStatusMap, setOcrStatusMap] = useState<Map<string, OcrStatus>>(new Map());    
@@ -153,6 +162,7 @@ export const OCRProvider = ({ children }: { children: ReactNode }) => {
     const contextValue = useMemo(
         () => ({
             settings, setSettings, serverSettings,
+            isSettingsOpen, openSettings, closeSettings,
             ocrCache, updateOcrData, ocrStatusMap, setOcrStatus,
             mergeAnchor, setMergeAnchor, activeImageSrc, setActiveImageSrc,
             dictPopup, setDictPopup, notifyPopupClosed, wasPopupClosedRecently,
@@ -160,7 +170,9 @@ export const OCRProvider = ({ children }: { children: ReactNode }) => {
             dialogState, showDialog, closeDialog, showConfirm, showAlert, showProgress
         }),
         [
-            settings, serverSettings, ocrCache, updateOcrData, ocrStatusMap, setOcrStatus, 
+            settings, serverSettings, 
+            isSettingsOpen, openSettings, closeSettings,
+            ocrCache, updateOcrData, ocrStatusMap, setOcrStatus, 
             mergeAnchor, activeImageSrc, dictPopup, notifyPopupClosed, wasPopupClosedRecently,
             debugLog, addLog,
             dialogState, showDialog, closeDialog, showConfirm, showAlert, showProgress
