@@ -13,8 +13,14 @@ export const GlobalDialog: React.FC = () => {
     if (!isOpen) return null;
 
     const handleConfirm = () => {
+        if (type === 'confirm') {
+            closeDialog();
+            if (onConfirm) onConfirm();
+            return;
+        }
+
         if (onConfirm) {
-            onConfirm(); 
+            onConfirm();
             // Auto-close for everything except progress bars
             if (type !== 'progress') closeDialog();
         } else {
