@@ -56,7 +56,7 @@ import {
     useReaderTapZoneStore,
 } from '@/features/reader/stores/ReaderStore.ts';
 import { ReaderZoomWrapper } from '@/features/reader/zoom/ReaderZoomWrapper';
-import { useIsMobile } from '@/Mangatan/hooks/useIsMobile';
+import { useIsMobile } from '@/Manatan/hooks/useIsMobile';
 
 const READING_MODE_TO_IN_VIEWPORT_TYPE: Record<ReadingMode, PageInViewportType> = {
     [ReadingMode.SINGLE_PAGE]: PageInViewportType.X,

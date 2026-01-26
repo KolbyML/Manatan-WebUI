@@ -1,4 +1,4 @@
-import { useIsMobile } from '@/Mangatan/hooks/useIsMobile';
+import { useIsMobile } from '@/Manatan/hooks/useIsMobile';
 import { useRef, useCallback, useEffect, useState, RefObject } from 'react';
 
 interface ZoomState {
