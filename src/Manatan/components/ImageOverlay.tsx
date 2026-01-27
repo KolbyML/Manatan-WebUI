@@ -58,9 +58,13 @@ const ImageOverlayInner = memo(({
                 return;
             }
 
+            if (!img.offsetParent) {
+                wrapper.style.display = 'none';
+                return;
+            }
+
             const rect = img.getBoundingClientRect();
             
-            // Check visibility
             const isInViewport = (
                 rect.bottom > 0 &&
                 rect.top < window.innerHeight &&
@@ -94,6 +98,27 @@ const ImageOverlayInner = memo(({
         // Initial sync
         syncPosition();
 
+        // IntersectionObserver for reliable visibility detection
+        const intersectionObserver = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        requestAnimationFrame(syncPosition);
+                    } else {
+                        wrapper.style.display = 'none';
+                    }
+                });
+            },
+            { threshold: [0, 0.1], rootMargin: '200px' }
+        );
+        intersectionObserver.observe(img);
+
+        const resizeObserver = new ResizeObserver(() => {
+            requestAnimationFrame(syncPosition);
+        });
+        resizeObserver.observe(img);
+
+        // Scroll/resize handlers
         let ticking = false;
         const onUpdateEvent = () => {
             if (ticking) return;
@@ -104,22 +129,16 @@ const ImageOverlayInner = memo(({
             });
         };
 
-        const resizeObserver = new ResizeObserver(() => {
-            onUpdateEvent();
-        });
-        resizeObserver.observe(img);
-
         window.addEventListener('scroll', onUpdateEvent, { capture: true, passive: true });
         window.addEventListener('resize', onUpdateEvent, { passive: true });
 
         return () => {
+            intersectionObserver.disconnect();
             resizeObserver.disconnect();
             window.removeEventListener('scroll', onUpdateEvent, true);
             window.removeEventListener('resize', onUpdateEvent);
         };
     }, [img, dimensions.width, dimensions.height, isVisible]);
-
-    if (status !== 'loading' && status !== 'error' && !data) return null;
 
     return createPortal(
         <div
@@ -132,7 +151,7 @@ const ImageOverlayInner = memo(({
                 left: 0,
                 pointerEvents: 'none',
                 willChange: 'transform',
-                display: 'none', // Start hidden until intial sync
+                display: 'none',
                 zIndex: 10,
             }}
         >
