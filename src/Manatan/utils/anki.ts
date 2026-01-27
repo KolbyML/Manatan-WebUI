@@ -196,11 +196,12 @@ export async function imageUrlToBase64Webp(
  */
 export async function updateLastCard(
     ankiConnectUrl: string,
-    imageUrl: string,
+    imageUrl: string | undefined, 
     sentence: string,
     pictureField: string,
     sentenceField: string,
     quality: number,
+    preEncodedBase64?: string 
 ) {
     // Find the last card
     const id = await getLastCardId(ankiConnectUrl);
@@ -228,21 +229,27 @@ export async function updateLastCard(
 
     // Handle picture field (if specified)
     if (pictureField && pictureField.trim()) {
-        const imageData = await imageUrlToBase64Webp(imageUrl, quality);
+        let rawData: string | null = null;
 
-        if (!imageData) {
-            throw new Error("Failed to process image (CORS or Load Error)");
+        if (preEncodedBase64) {
+            rawData = preEncodedBase64.includes('base64,') 
+                ? preEncodedBase64.split(';base64,')[1] 
+                : preEncodedBase64;
+        } else if (imageUrl) {
+            const fullBase64 = await imageUrlToBase64Webp(imageUrl, quality);
+            if (!fullBase64) throw new Error("Failed to process image (CORS or Load Error)");
+            rawData = fullBase64.split(';base64,')[1];
         }
 
-        // Clear existing image first
-        fields[pictureField] = "";
-
-        // Add new image
-        updatePayload.note.picture = {
-            filename: `manatan_${id}.webp`,
-            data: imageData.split(";base64,")[1],
-            fields: [pictureField],
-        };
+        if (rawData) {
+            // Clear existing image first
+            fields[pictureField] = ""; 
+            updatePayload.note.picture = {
+                filename: `manatan_${id}.webp`,
+                data: rawData,
+                fields: [pictureField],
+            };
+        }
     }
 
     await ankiConnect("updateNoteFields", updatePayload, ankiConnectUrl);
