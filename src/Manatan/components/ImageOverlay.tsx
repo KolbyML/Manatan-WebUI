@@ -5,8 +5,8 @@ import { OcrBlock } from '@/Manatan/types';
 import { apiRequest } from '@/Manatan/utils/api';
 import { TextBox } from '@/Manatan/components/TextBox';
 import { StatusIcon } from '@/Manatan/components/StatusIcon';
-// Ensure this path matches your file structure!
-import { useReaderOverlayStore } from '@/features/reader/stores/ReaderStore'; 
+import { useReaderOverlayStore, useReaderSettingsStore } from '@/features/reader/stores/ReaderStore'; 
+import { ReadingMode } from '@/features/reader/Reader.types.ts';
 
 const getOverlayContainer = (): HTMLElement => {
     let container = document.getElementById('ocr-overlay-layer');
@@ -166,7 +166,7 @@ const ImageOverlayInner = memo(({
                 <div style={{ opacity: shouldShowChildren ? 1 : 0, transition: 'opacity 0.2s' }}>
                     <StatusIcon status={status} onRetry={onRetry} />
                 </div>
-                
+
                 {isVisible && data?.map((block: OcrBlock, i: number) => (
                     <TextBox
                         key={`${i}-${block.text.substring(0, 5)}`}
@@ -201,6 +201,8 @@ export const ImageOverlay: React.FC<{
     const data = ocrCache.get(img.src) || null;
     const currentStatus = ocrCache.has(img.src) ? 'success' : (ocrStatusMap.get(img.src) || 'idle');
     const isReaderOverlayVisible = useReaderOverlayStore((state) => state.overlay.isVisible);
+    
+    const readingMode = useReaderSettingsStore((state) => state.settings.readingMode.value);
 
     const hideTimerRef = useRef<number | null>(null);
     const isPopupOpenRef = useRef(false);
@@ -296,7 +298,23 @@ export const ImageOverlay: React.FC<{
     }, [data, img.src, updateOcrData]);
 
     const isImgDisplayed = img.offsetParent !== null; 
-    const isGlobalEnabled = settings.enableOverlay && isImgDisplayed && !isReaderOverlayVisible;
+
+    const isPaginatedMode = readingMode === ReadingMode.SINGLE_PAGE || readingMode === ReadingMode.DOUBLE_PAGE;
+    
+    let isCorrectChapter = true;
+    if (isPaginatedMode) {
+        const currentChapterMatch = window.location.pathname.match(/\/chapter\/(\d+)/);
+        const currentChapterId = currentChapterMatch ? currentChapterMatch[1] : null;
+        
+        const imgChapterMatch = img.src.match(/\/chapter\/(\d+)\//);
+        const imgChapterId = imgChapterMatch ? imgChapterMatch[1] : null;
+        
+        if (currentChapterId && imgChapterId) {
+            isCorrectChapter = currentChapterId === imgChapterId;
+        }
+    }
+    
+    const isGlobalEnabled = settings.enableOverlay && isImgDisplayed && !isReaderOverlayVisible && isCorrectChapter;
     const shouldShowChildren = !settings.soloHoverMode || settings.interactionMode === 'click' || settings.debugMode || currentStatus === 'loading' || currentStatus === 'error';
 
     if (!isGlobalEnabled) return null;
