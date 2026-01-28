@@ -192,15 +192,95 @@ export async function imageUrlToBase64Webp(
 }
 
 /**
+ * HTML inheritance logic adapted from asbplayer
+ * Original Author: killergerbah
+ * License: MIT
+ * Source: https://github.com/killergerbah/asbplayer
+ */
+
+
+const htmlTagRegexString = '<([^/ >])*[^>]*>(.*?)</\\1>';
+
+// Given <a><b>content</b></a> return ['<a><b>content</b></a>', '<b>content</b>', 'content']
+const tagContent = (html: string) => {
+    const htmlTagRegex = new RegExp(htmlTagRegexString);
+    let content = html;
+    let contents = [html];
+
+    while (true) {
+        const match = htmlTagRegex.exec(content);
+
+        if (match === null || match.length < 3) {
+            break;
+        }
+
+        content = match[2];
+        contents.push(content);
+    }
+
+    return contents;
+};
+
+export const inheritHtmlMarkup = (original: string, markedUp: string) => {
+    // If there is no markup to inherit, just return the original plain text
+    if (!markedUp) return original;
+    
+    const htmlTagRegex = new RegExp(htmlTagRegexString, 'ig');
+    const markedUpWithoutBreaklines = markedUp.replaceAll('<br>', '');
+    let inherited = original;
+
+    // Safety brake to prevent infinite loops if regex fails to advance
+    let safetyCounter = 0; 
+
+    while (safetyCounter++ < 100) {
+        const match = htmlTagRegex.exec(markedUpWithoutBreaklines);
+
+        if (match === null || match.length < 3) {
+            break;
+        }
+
+        let newInherited = inherited;
+
+        // Only try to apply the tag if the new string doesn't already have this exact tag+content
+        if (!inherited.includes(match[0])) {
+            const candidateTargets = tagContent(match[2]);
+
+            // Try to find the inner text in the new string and wrap it
+            for (const target of candidateTargets) {
+                // Skip very short targets to avoid accidentally bolding single letters like "a" or "I"
+                if (target.trim().length < 2 && !target.match(/[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf\u3400-\u4dbf]/)) {
+                     continue; 
+                }
+                
+                // If we find the text content in our new string, apply the tag from the match
+                if (inherited.includes(target)) {
+                    newInherited = inherited.replace(target, match[0]); 
+                }
+
+                if (newInherited !== inherited) {
+                    break;
+                }
+            }
+        }
+
+        inherited = newInherited;
+    }
+
+    return inherited;
+};
+
+
+/**
  * Update the last created Anki card with image and/or sentence
  */
 export async function updateLastCard(
     ankiConnectUrl: string,
-    imageUrl: string,
+    imageUrl: string | undefined, 
     sentence: string,
     pictureField: string,
     sentenceField: string,
     quality: number,
+    preEncodedBase64?: string 
 ) {
     // Find the last card
     const id = await getLastCardId(ankiConnectUrl);
@@ -214,6 +294,28 @@ export async function updateLastCard(
     }
 
     const fields: Record<string, any> = {};
+    
+    // Handle sentence field (if specified)
+    if (sentenceField && sentenceField.trim() && sentence) {
+        try {
+            const noteInfo = await ankiConnect('notesInfo', { notes: [id] }, ankiConnectUrl);
+            
+            let finalSentence = sentence;
+
+            // If the field exists in Anki, try to merge its HTML tags
+            if (noteInfo && noteInfo[0] && noteInfo[0].fields && noteInfo[0].fields[sentenceField]) {
+                const currentAnkiText = noteInfo[0].fields[sentenceField].value;
+                finalSentence = inheritHtmlMarkup(sentence, currentAnkiText);
+            }
+
+            fields[sentenceField] = finalSentence;
+
+        } catch (e) {
+            console.warn("Failed to fetch existing note info, overwriting sentence without preserving HTML.", e);
+            fields[sentenceField] = sentence;
+        }
+    }
+    
     const updatePayload: any = {
         note: {
             id,
@@ -221,28 +323,29 @@ export async function updateLastCard(
         },
     };
 
-    // Handle sentence field (if specified)
-    if (sentenceField && sentenceField.trim() && sentence) {
-        fields[sentenceField] = sentence;
-    }
-
     // Handle picture field (if specified)
     if (pictureField && pictureField.trim()) {
-        const imageData = await imageUrlToBase64Webp(imageUrl, quality);
+        let rawData: string | null = null;
 
-        if (!imageData) {
-            throw new Error("Failed to process image (CORS or Load Error)");
+        if (preEncodedBase64) {
+            rawData = preEncodedBase64.includes('base64,') 
+                ? preEncodedBase64.split(';base64,')[1] 
+                : preEncodedBase64;
+        } else if (imageUrl) {
+            const fullBase64 = await imageUrlToBase64Webp(imageUrl, quality);
+            if (!fullBase64) throw new Error("Failed to process image (CORS or Load Error)");
+            rawData = fullBase64.split(';base64,')[1];
         }
 
-        // Clear existing image first
-        fields[pictureField] = "";
-
-        // Add new image
-        updatePayload.note.picture = {
-            filename: `manatan_${id}.webp`,
-            data: imageData.split(";base64,")[1],
-            fields: [pictureField],
-        };
+        if (rawData) {
+            // Clear existing image first
+            fields[pictureField] = ""; 
+            updatePayload.note.picture = {
+                filename: `manatan_${id}.webp`,
+                data: rawData,
+                fields: [pictureField],
+            };
+        }
     }
 
     await ankiConnect("updateNoteFields", updatePayload, ankiConnectUrl);

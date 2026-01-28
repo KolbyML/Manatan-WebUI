@@ -226,7 +226,7 @@ export const TextBox: React.FC<{
         }
 
         let content = cleanPunctuation(block.text, settings.addSpaceOnMerge);
-        content = content.replace(/\u200B/g, '\n');
+        content = content.replace(/[\u200B\n\r]+/g, '');
 
         if (settings.ankiEnableCropper) {
             setShowCropper(true);
@@ -264,7 +264,7 @@ export const TextBox: React.FC<{
     const handleCropperComplete = async (croppedImage: string) => {
         setShowCropper(false);
         let content = cleanPunctuation(block.text, settings.addSpaceOnMerge);
-        content = content.replace(/\u200B/g, '\n');
+        content = content.replace(/[\u200B\n\r]+/g, '');
 
         showConfirm(
             'Update Anki Card?',
@@ -276,43 +276,16 @@ export const TextBox: React.FC<{
                     const imgField = getTargetField('Image');
                     const sentField = getTargetField('Sentence');
 
-                    // Manually construct the update since we already have the cropped image
-                    const id = await (async () => {
-                        const ankiConnectUrl = settings.ankiConnectUrl || 'http://127.0.0.1:8765';
-                        const res = await fetch(ankiConnectUrl, {
-                            method: 'POST',
-                            body: JSON.stringify({ action: 'findNotes', params: { query: 'added:1' }, version: 6 })
-                        });
-                        const json = await res.json();
-                        if (!json.result || !Array.isArray(json.result)) return undefined;
-                        return json.result.sort().at(-1);
-                    })();
+                    await updateLastCard(
+                        settings.ankiConnectUrl || 'http://127.0.0.1:8765',
+                        undefined,
+                        content,
+                        imgField || '',
+                        sentField || '',
+                        settings.ankiImageQuality || 0.92,
+                        croppedImage
+                    );
 
-                    if (!id) throw new Error('Could not find recent card (no cards created today)');
-
-                    const updatePayload: any = { note: { id, fields: {} } };
-                    
-                    if (sentField && sentField.trim() && content) {
-                        updatePayload.note.fields[sentField] = content;
-                    }
-                    
-                    if (imgField && imgField.trim()) {
-                        updatePayload.note.fields[imgField] = ''; 
-                        updatePayload.note.picture = {
-                            filename: `manatan_${id}.webp`,
-                            data: croppedImage.split(';base64,')[1],
-                            fields: [imgField]
-                        };
-                    }
-
-                    const ankiConnectUrl = settings.ankiConnectUrl || 'http://127.0.0.1:8765';
-                    const res = await fetch(ankiConnectUrl, {
-                        method: 'POST',
-                        body: JSON.stringify({ action: 'updateNoteFields', params: updatePayload, version: 6 })
-                    });
-                    const json = await res.json();
-                    if (json.error) throw new Error(json.error);
-                    
                     closeDialog();
                     makeToast('Anki card updated successfully!', { variant: 'success', autoHideDuration: 1500 });
                 } catch (err: any) {
@@ -410,7 +383,7 @@ export const TextBox: React.FC<{
             }
 
             let content = cleanPunctuation(block.text, settings.addSpaceOnMerge);
-            content = content.replace(/\u200B/g, '\n');
+            content = content.replace(/[\u200B\n\r]+/g, '');
 
             const encoder = new TextEncoder();
             const prefix = content.substring(0, charOffset);
