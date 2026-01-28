@@ -352,24 +352,9 @@ export const PagedReader: React.FC<PagedReaderProps> = ({
         const target = e.target as HTMLElement;
         if (target.closest('a, button, img, ruby rt, .nav-btn, .reader-progress, .reader-slider-wrap')) return;
 
-        const scroll = scrollRef.current;
-        if (!scroll) return;
-
-        const zone = getClickZone(e, scroll, navOptions);
-
-        switch (zone) {
-            case 'next':
-                goNext();
-                break;
-            case 'prev':
-                goPrev();
-                break;
-            case 'center':
-                const didLookup = await tryLookup(e);
-                if (!didLookup) onToggleUI?.();
-                break;
-        }
-    }, [navOptions, goNext, goPrev, onToggleUI, tryLookup]);
+        const didLookup = await tryLookup(e);
+        if (!didLookup) onToggleUI?.();
+    }, [onToggleUI, tryLookup]);
 
     // Touch handlers
     const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -383,15 +368,7 @@ export const PagedReader: React.FC<PagedReaderProps> = ({
         touchStartRef.current = null;
 
         if (!result) {
-            const touch = e.changedTouches[0];
-            const zone = getClickZone(
-                { clientX: touch.clientX, clientY: touch.clientY },
-                scrollRef.current,
-                navOptions
-            );
-            if (zone === 'center') {
-                onToggleUI?.();
-            }
+            onToggleUI?.();
         }
     }, [navOptions, navCallbacks, onToggleUI]);
 

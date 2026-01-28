@@ -268,18 +268,10 @@ export const ContinuousReader: React.FC<ContinuousReaderProps> = ({
     const handleClick = useCallback(async (e: React.MouseEvent) => {
         const target = e.target as HTMLElement;
         if (target.closest('a, button, img, ruby rt, .nav-btn, .reader-progress, .reader-slider-wrap')) return;
-        const container = containerRef.current;
-        if (!container) return;
-        const zone = getClickZone(e, container, navOptions);
-        switch (zone) {
-            case 'next': scrollSmall(true); break;
-            case 'prev': scrollSmall(false); break;
-            case 'center':
-                const didLookup = await tryLookup(e);
-                if (!didLookup) onToggleUI?.();
-                break;
-        }
-    }, [navOptions, scrollSmall, onToggleUI, tryLookup]);
+
+        const didLookup = await tryLookup(e);
+        if (!didLookup) onToggleUI?.();
+    }, [onToggleUI, tryLookup]);
 
     return (
         <div className={`continuous-reader-wrapper ${isRTL ? 'rtl-mode' : 'ltr-mode'}`} style={{ backgroundColor: theme.bg, color: theme.fg, direction: isRTL ? 'rtl' : 'ltr' }}>
