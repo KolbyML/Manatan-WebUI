@@ -37,6 +37,7 @@ import { useAppTitle } from '@/features/navigation-bar/hooks/useAppTitle';
 import { useMetadataServerSettings } from '@/features/settings/services/ServerSettingsMetadata';
 import { useResizeObserver } from '@/base/hooks/useResizeObserver';
 import { useNavBarContext } from '@/features/navigation-bar/NavbarContext';
+import LibraryAddCheckIcon from '@mui/icons-material/LibraryAddCheck';
 
 interface LibraryItem extends LNMetadata {
     importProgress?: number;
@@ -380,8 +381,8 @@ export const LNLibrary: React.FC = () => {
         return title
             .toLowerCase()
             .replace(/\.epub$/i, '')
-            .replace(/[^\w\s]/g, '') // Remove special characters
-            .replace(/\s+/g, ' ')    // Normalize whitespace
+            .replace(/[^\p{L}\p{N}\s]/gu, '') // Unicode-aware: keeps all letters and numbers
+            .replace(/\s+/g, ' ')
             .trim();
     };
 
@@ -656,20 +657,33 @@ export const LNLibrary: React.FC = () => {
                         </Button>
                     </>
                 ) : (
-                    <Button
-                        color="inherit"
-                        component="label"
-                        startIcon={<UploadFileIcon />}
-                        disabled={isImporting}
-                        sx={{ textTransform: 'none' }}
-                    >
-                        {isImporting ? 'Importing...' : 'Import EPUB'}
-                        <input type="file" accept=".epub" multiple hidden onChange={handleImport} />
-                    </Button>
+                    <>
+                        {/* Add Multi-Select Button here */}
+                        {library.length > 0 && (
+                            <IconButton
+                                color="inherit"
+                                onClick={() => setIsSelectionMode(true)}
+                                size="small"
+                                sx={{ mr: 1 }}
+                            >
+                                <LibraryAddCheckIcon />
+                            </IconButton>
+                        )}
+                        <Button
+                            color="inherit"
+                            component="label"
+                            startIcon={<UploadFileIcon />}
+                            disabled={isImporting}
+                            sx={{ textTransform: 'none' }}
+                        >
+                            {isImporting ? 'Importing...' : 'Import EPUB'}
+                            <input type="file" accept=".epub" multiple hidden onChange={handleImport} />
+                        </Button>
+                    </>
                 )}
             </Stack>
         ),
-        [handleImport, isImporting, isSelectionMode, selectedIds.size, handleMultiDelete, handleSelectAll, handleCancelSelection]
+        [handleImport, isImporting, isSelectionMode, selectedIds.size, handleMultiDelete, handleSelectAll, handleCancelSelection, library.length]
     );
 
     useAppAction(appAction, [appAction]);
