@@ -95,9 +95,12 @@ export function useBookContent(bookId: string | undefined): UseBookContentReturn
                         }
 
                         if (blobUrl) {
-                            return `src="${blobUrl}" data-epub-src="${path}"`;
+                            console.log(`[useBookContent] Resolved image: ${path} -> ${blobUrl.substring(0, 30)}...`);
+                            return `src="${blobUrl}" href="${blobUrl}" xlink:href="${blobUrl}" data-epub-src="${path}"`;
                         }
 
+                        console.warn(`[useBookContent] Failed to resolve image path: ${path} in book ${bookId}`);
+                        console.log('[useBookContent] Available paths:', Array.from(bookBlobUrls!.keys()));
                         return match;
                     });
                 });

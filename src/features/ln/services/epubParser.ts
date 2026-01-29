@@ -132,6 +132,7 @@ export async function parseEpub(
 
         content.forEach((relativePath, zipEntry) => {
             if (!zipEntry.dir && /\.(jpe?g|png|gif|webp|svg|bmp)$/i.test(relativePath)) {
+                console.log(`[EPUB Parser] Found image: ${relativePath}`);
                 imageFiles.push({ path: relativePath, file: zipEntry });
             }
         });
@@ -154,8 +155,10 @@ export async function parseEpub(
                             bmp: 'image/bmp',
                         };
                         const mimeType = mimeTypes[ext || ''] || 'image/png';
+                        console.log(`[EPUB Parser] Processed image ${path} as ${mimeType} (${blob.size} bytes)`);
                         return { path, blob: new Blob([blob], { type: mimeType }) };
-                    } catch {
+                    } catch (err) {
+                        console.error(`[EPUB Parser] Failed to process image ${path}:`, err);
                         return null;
                     }
                 })
@@ -213,14 +216,9 @@ export async function parseEpub(
 
                 if (srcAttr && !srcAttr.startsWith('http') && !srcAttr.startsWith('data:')) {
                     const resolvedPath = resolvePath(fullPath, srcAttr);
-
-                    // Mark with data attribute for later blob restoration
                     img.setAttribute('data-epub-src', resolvedPath);
-                    img.setAttribute('src', ''); // Clear src, will be set at render
-
-                    if (img.hasAttribute('xlink:href')) {
-                        img.setAttribute('xlink:href', '');
-                    }
+                    img.removeAttribute('src');
+                    img.removeAttribute('xlink:href');
                 }
 
                 img.removeAttribute('width');

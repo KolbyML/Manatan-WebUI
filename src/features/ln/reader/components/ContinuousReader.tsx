@@ -1,7 +1,6 @@
 
 
-import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
-import { Settings } from '@/Manatan/types';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { ReaderNavigationUI } from './ReaderNavigationUI';
 import { ChapterBlock } from './ChapterBlock';
 import { useReaderCore } from '../hooks/useReaderCore';
@@ -9,7 +8,6 @@ import { useChapterLoader } from '../hooks/useChapterLoader';
 import { buildContainerStyles } from '../utils/styles';
 import { calculateProgress } from '../utils/navigation';
 import { ContinuousReaderProps } from '../types/reader';
-import { BookStats } from '@/lib/storage/AppStorage';
 import './ContinuousReader.css';
 
 export const ContinuousReader: React.FC<ContinuousReaderProps> = ({
@@ -186,7 +184,8 @@ export const ContinuousReader: React.FC<ContinuousReaderProps> = ({
         const handleWheel = (e: WheelEvent) => {
             if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
                 e.preventDefault();
-                const delta = isRTL ? -e.deltaY : e.deltaY;
+                const speedMultiplier = 1.5;
+                const delta = (isRTL ? -e.deltaY : e.deltaY) * speedMultiplier;
                 container.scrollLeft += delta;
             }
         };
@@ -200,7 +199,7 @@ export const ContinuousReader: React.FC<ContinuousReaderProps> = ({
             const container = containerRef.current;
             if (!container) return;
 
-            const amount = 100;
+            const amount = 200;
 
             if (isVertical) {
                 const delta = forward ? (isRTL ? -amount : amount) : isRTL ? amount : -amount;

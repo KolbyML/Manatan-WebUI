@@ -1,6 +1,4 @@
-/**
- * Shared Reader Navigation UI
- */
+
 
 import React from 'react';
 import './ReaderNavigationUI.css';
@@ -16,7 +14,7 @@ interface ReaderNavigationUIProps {
     currentChapter: number;
     totalChapters: number;
     progress: number;
-    totalBookProgress?: number; 
+    totalBookProgress?: number;
     showSlider?: boolean;
     onPageChange?: (page: number) => void;
     theme: { bg: string; fg: string };
@@ -44,7 +42,7 @@ export const ReaderNavigationUI: React.FC<ReaderNavigationUIProps> = ({
 }) => {
     if (!visible) return null;
 
-    // Prefer global progress if available
+
     const displayProgress = totalBookProgress !== undefined ? totalBookProgress : progress;
 
     return (
@@ -77,7 +75,7 @@ export const ReaderNavigationUI: React.FC<ReaderNavigationUIProps> = ({
                             <span className="progress-sep">·</span>
                         </>
                     ) : null}
-                    <span className="progress-chapter">Ch {currentChapter + 1}/{totalChapters}</span>
+                    <span className="progress-chapter">Page {currentChapter + 1}/{totalChapters}</span>
                     <span className="progress-sep">·</span>
                     <span className="progress-percent">{displayProgress.toFixed(1)}%</span>
                 </div>
