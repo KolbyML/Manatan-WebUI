@@ -84,23 +84,68 @@ export async function parseEpub(
         // --- Cover ---
         let coverBase64 = '';
         try {
+            // Strategy 1: EPUB 3 'properties' attribute
             let coverItem = opfDoc.querySelector('manifest > item[properties*="cover-image"]');
+
+            // Strategy 2: EPUB 2 <meta name="cover" content="item-id" />
+            if (!coverItem) {
+                const metaCover = opfDoc.querySelector('metadata > meta[name="cover"]');
+                if (metaCover) {
+                    const coverId = metaCover.getAttribute('content');
+                    if (coverId) {
+                        coverItem = opfDoc.querySelector(`manifest > item[id="${coverId}"]`);
+                    }
+                }
+            }
+
+            // Strategy 3: ID convention (id="cover")
             if (!coverItem) {
                 coverItem = opfDoc.querySelector('manifest > item[id="cover"]')
                     || opfDoc.querySelector('manifest > item[id="cover-image"]');
+            }
+
+            // Strategy 4: Search manifest for an href containing 'cover'
+            if (!coverItem) {
+                const allImages = opfDoc.querySelectorAll('manifest > item[media-type^="image/"]');
+                for (let i = 0; i < allImages.length; i++) {
+                    const href = allImages[i].getAttribute('href') || '';
+                    if (href.toLowerCase().includes('cover')) {
+                        coverItem = allImages[i];
+                        break;
+                    }
+                }
             }
 
             if (coverItem) {
                 const href = coverItem.getAttribute('href');
                 if (href) {
                     const fullPath = resolvePath(opfPath, href);
-                    const coverBlob = await content.file(fullPath)?.async('blob');
-                    if (coverBlob) {
-                        coverBase64 = await resizeCover(coverBlob);
+
+                    // Try exact match
+                    let file = content.file(fullPath);
+
+                    // Case-insensitive fallback (JSZip is case sensitive, EPUBs often aren't)
+                    if (!file) {
+                        const targetPath = fullPath.toLowerCase();
+                        // Search all files in zip
+                        for (const fileName of Object.keys(content.files)) {
+                            if (fileName.toLowerCase() === targetPath) {
+                                file = content.file(fileName);
+                                break;
+                            }
+                        }
+                    }
+
+                    if (file) {
+                        const coverBlob = await file.async('blob');
+                        if (coverBlob) {
+                            coverBase64 = await resizeCover(coverBlob);
+                        }
                     }
                 }
             }
-        } catch {
+        } catch (e) {
+            console.warn('Cover extraction failed:', e);
             // Cover extraction is optional
         }
 
