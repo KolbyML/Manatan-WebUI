@@ -98,24 +98,20 @@ export const PagedReader: React.FC<PagedReaderProps> = ({
     useEffect(() => {
         if (!contentRef.current || contentWidth <= 0) return;
 
-        setContentReady(false);
-
         const content = contentRef.current;
 
-        // Wait for images to load
         const images = content.querySelectorAll('img');
         const imagePromises = Array.from(images).map(img => {
             if (img.complete) return Promise.resolve();
             return new Promise<void>(resolve => {
                 img.onload = () => resolve();
                 img.onerror = () => resolve();
-                setTimeout(resolve, 100); // Timeout fallback
+                setTimeout(resolve, 100);
             });
         });
 
         Promise.all(imagePromises).then(() => {
             requestAnimationFrame(() => {
-                // Force layout
                 void content.offsetHeight;
 
                 const scrollSize = isVertical ? content.scrollHeight : content.scrollWidth;
@@ -128,20 +124,35 @@ export const PagedReader: React.FC<PagedReaderProps> = ({
                 }
 
                 setTotalPages(calculatedPages);
-                setContentReady(true);
-                setIsTransitioning(false);
+
+                const intent = navigationIntentRef.current;
+                navigationIntentRef.current = null;
+
+                if (intent?.goToLastPage) {
+                    const lastPage = calculatedPages - 1;
+                    const pageOffset = lastPage * (columnWidth + COLUMN_GAP);
+                    const transform = isVertical
+                        ? `translateY(-${pageOffset}px)`
+                        : `translateX(-${pageOffset}px)`;
+
+                    content.style.transform = transform;
+                    setCurrentPage(lastPage);
+                }
+
+                requestAnimationFrame(() => {
+                    setIsTransitioning(false);
+                    setContentReady(true);
+                });
             });
         });
     }, [currentHtml, dimensions, contentWidth, columnWidth, isVertical]);
 
-    // Report page changes
     useEffect(() => {
         if (contentReady && !isTransitioning) {
             reportPageChange(currentPage, totalPages);
         }
     }, [currentPage, totalPages, contentReady, isTransitioning, reportPageChange]);
 
-    // Navigation functions
     const goToPage = useCallback(
         (page: number) => {
             const clamped = Math.max(0, Math.min(page, totalPages - 1));
@@ -151,6 +162,7 @@ export const PagedReader: React.FC<PagedReaderProps> = ({
         },
         [totalPages, currentPage]
     );
+    const navigationIntentRef = useRef<{ goToLastPage: boolean } | null>(null);
 
     const goToSection = useCallback(
         (section: number, goToLastPage = false) => {
@@ -159,19 +171,18 @@ export const PagedReader: React.FC<PagedReaderProps> = ({
 
             setIsTransitioning(true);
             setContentReady(false);
+
+            navigationIntentRef.current = { goToLastPage };
+
             setCurrentSection(clamped);
-            setCurrentPage(goToLastPage ? -1 : 0); // -1 = go to last page once calculated
+            setCurrentPage(0);
             reportChapterChange(clamped, goToLastPage ? -1 : 0);
         },
         [chapters.length, currentSection, reportChapterChange]
     );
 
-    // Fix page if going to last page of new chapter
-    useEffect(() => {
-        if (currentPage === -1 && totalPages > 0 && contentReady) {
-            setCurrentPage(totalPages - 1);
-        }
-    }, [currentPage, totalPages, contentReady]);
+
+
 
     const goNext = useCallback(() => {
         if (currentPage < totalPages - 1) {
