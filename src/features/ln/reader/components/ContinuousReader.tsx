@@ -181,18 +181,24 @@ export const ContinuousReader: React.FC<ContinuousReaderProps> = ({
         const container = containerRef.current;
         if (!container || !isVertical) return;
 
+        const lineHeightPx = (settings.lnFontSize || 18) * (settings.lnLineHeight || 1.8);
+
         const handleWheel = (e: WheelEvent) => {
             if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
                 e.preventDefault();
-                const speedMultiplier = 1.5;
-                const delta = (isRTL ? -e.deltaY : e.deltaY) * speedMultiplier;
-                container.scrollLeft += delta;
+                let delta = e.deltaY;
+                if (e.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+                    delta *= lineHeightPx;
+                } else if (e.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+                    delta *= container.clientWidth;
+                }
+                container.scrollLeft += isRTL ? -delta : delta;
             }
         };
 
         container.addEventListener('wheel', handleWheel, { passive: false });
         return () => container.removeEventListener('wheel', handleWheel);
-    }, [isVertical, isRTL]);
+    }, [isVertical, isRTL, settings.lnFontSize, settings.lnLineHeight]);
 
     const scrollSmall = useCallback(
         (forward: boolean) => {

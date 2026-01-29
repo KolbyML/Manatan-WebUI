@@ -22,5 +22,6 @@ export function buildContainerStyles(
     return {
         ...buildTypographyStyles(settings, isVertical),
         direction: isVertical ? (isRTL ? 'rtl' : 'ltr') : 'ltr',
+        scrollBehavior: isVertical ? 'auto' : 'smooth',
     };
 }
