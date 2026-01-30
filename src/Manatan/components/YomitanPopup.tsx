@@ -1,11 +1,15 @@
-import React, { useRef, useLayoutEffect, useState, useMemo, useEffect } from 'react';
+import React, { useCallback, useRef, useLayoutEffect, useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useOCR } from '@/Manatan/context/OCRContext';
 import { findNotes, addNote, guiBrowse, imageUrlToBase64Webp } from '@/Manatan/utils/anki';
+import { cleanPunctuation, lookupYomitan } from '@/Manatan/utils/api';
 import { DictionaryResult } from '@/Manatan/types';
 import { CropperModal } from '@/Manatan/components/CropperModal';
 
-export const StructuredContent: React.FC<{ contentString: string }> = ({ contentString }) => {
+export const StructuredContent: React.FC<{
+    contentString: string;
+    onLinkClick?: (href: string, text: string) => void;
+}> = ({ contentString, onLinkClick }) => {
     const parsedData = useMemo(() => {
         if (!contentString) return null;
         try {
@@ -16,14 +20,23 @@ export const StructuredContent: React.FC<{ contentString: string }> = ({ content
     }, [contentString]);
 
     if (parsedData === null || parsedData === undefined) return null;
-    return <ContentNode node={parsedData} />;
+    return <ContentNode node={parsedData} onLinkClick={onLinkClick} />;
 };
 
-const ContentNode: React.FC<{ node: any }> = ({ node }) => {
+const getNodeText = (node: any): string => {
+    if (node === null || node === undefined) return '';
+    if (typeof node === 'string' || typeof node === 'number') return String(node);
+    if (Array.isArray(node)) return node.map(getNodeText).join('');
+    if (node.type === 'structured-content') return getNodeText(node.content);
+    if (node && typeof node === 'object') return getNodeText(node.content);
+    return '';
+};
+
+const ContentNode: React.FC<{ node: any; onLinkClick?: (href: string, text: string) => void }> = ({ node, onLinkClick }) => {
     if (node === null || node === undefined) return null;
     if (typeof node === 'string' || typeof node === 'number') return <>{node}</>;
-    if (Array.isArray(node)) return <>{node.map((item, i) => <ContentNode key={i} node={item} />)}</>;
-    if (node.type === 'structured-content') return <ContentNode node={node.content} />;
+    if (Array.isArray(node)) return <>{node.map((item, i) => <ContentNode key={i} node={item} onLinkClick={onLinkClick} />)}</>;
+    if (node.type === 'structured-content') return <ContentNode node={node.content} onLinkClick={onLinkClick} />;
 
     const { tag, content, style, href } = node;
     const s = style || {};
@@ -39,18 +52,41 @@ const ContentNode: React.FC<{ node: any }> = ({ node }) => {
     
     const listStyle: React.CSSProperties = { paddingLeft: '20px', margin: '2px 0', listStyleType: 'disc' };
 
+    const handleLinkClick = (event: React.MouseEvent) => {
+        if (!onLinkClick) {
+            return;
+        }
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+            return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        onLinkClick(href || '', getNodeText(content));
+    };
+
     switch (tag) {
-        case 'ul': return <ul style={{ ...s, ...listStyle }}><ContentNode node={content} /></ul>;
-        case 'ol': return <ol style={{ ...s, ...listStyle, listStyleType: 'decimal' }}><ContentNode node={content} /></ol>;
-        case 'li': return <li style={{ ...s }}><ContentNode node={content} /></li>;
-        case 'table': return <table style={{ ...s, ...tableStyle }}><tbody><ContentNode node={content} /></tbody></table>;
-        case 'tr': return <tr style={s}><ContentNode node={content} /></tr>;
-        case 'th': return <th style={{ ...s, ...cellStyle, fontWeight: 'bold' }}><ContentNode node={content} /></th>;
-        case 'td': return <td style={{ ...s, ...cellStyle }}><ContentNode node={content} /></td>;
-        case 'span': return <span style={s}><ContentNode node={content} /></span>;
-        case 'div': return <div style={s}><ContentNode node={content} /></div>;
-        case 'a': return <a href={href} style={{ ...s, color: '#4890ff', textDecoration: 'underline' }} target="_blank" rel="noreferrer"><ContentNode node={content} /></a>;
-        default: return <ContentNode node={content} />;
+        case 'ul': return <ul style={{ ...s, ...listStyle }}><ContentNode node={content} onLinkClick={onLinkClick} /></ul>;
+        case 'ol': return <ol style={{ ...s, ...listStyle, listStyleType: 'decimal' }}><ContentNode node={content} onLinkClick={onLinkClick} /></ol>;
+        case 'li': return <li style={{ ...s }}><ContentNode node={content} onLinkClick={onLinkClick} /></li>;
+        case 'table': return <table style={{ ...s, ...tableStyle }}><tbody><ContentNode node={content} onLinkClick={onLinkClick} /></tbody></table>;
+        case 'tr': return <tr style={s}><ContentNode node={content} onLinkClick={onLinkClick} /></tr>;
+        case 'th': return <th style={{ ...s, ...cellStyle, fontWeight: 'bold' }}><ContentNode node={content} onLinkClick={onLinkClick} /></th>;
+        case 'td': return <td style={{ ...s, ...cellStyle }}><ContentNode node={content} onLinkClick={onLinkClick} /></td>;
+        case 'span': return <span style={s}><ContentNode node={content} onLinkClick={onLinkClick} /></span>;
+        case 'div': return <div style={s}><ContentNode node={content} onLinkClick={onLinkClick} /></div>;
+        case 'a':
+            return (
+                <a
+                    href={href}
+                    style={{ ...s, color: '#4890ff', textDecoration: 'underline' }}
+                    target={onLinkClick ? undefined : '_blank'}
+                    rel={onLinkClick ? undefined : 'noreferrer'}
+                    onClick={onLinkClick ? handleLinkClick : undefined}
+                >
+                    <ContentNode node={content} onLinkClick={onLinkClick} />
+                </a>
+            );
+        default: return <ContentNode node={content} onLinkClick={onLinkClick} />;
     }
 };
 
@@ -399,6 +435,113 @@ export const YomitanPopup = () => {
     const popupRef = useRef<HTMLDivElement>(null);
     const backdropRef = useRef<HTMLDivElement>(null);
     const [posStyle, setPosStyle] = useState<React.CSSProperties>({});
+    const getLookupTextFromHref = useCallback((href: string, fallback: string) => {
+        const safeFallback = fallback.trim();
+        if (!href) {
+            return safeFallback;
+        }
+        const trimmedHref = href.trim();
+        if (!trimmedHref) {
+            return safeFallback;
+        }
+
+        const extractQuery = (params: URLSearchParams) =>
+            params.get('query') || params.get('text') || params.get('term') || params.get('q') || '';
+
+        if (trimmedHref.startsWith('http://') || trimmedHref.startsWith('https://')) {
+            try {
+                const parsed = new URL(trimmedHref);
+                const queryText = extractQuery(parsed.searchParams);
+                if (queryText) {
+                    return queryText;
+                }
+            } catch (err) {
+                console.warn('Failed to parse http link', err);
+            }
+            return safeFallback;
+        }
+
+        if (trimmedHref.startsWith('?') || trimmedHref.includes('?')) {
+            const queryString = trimmedHref.startsWith('?')
+                ? trimmedHref.slice(1)
+                : trimmedHref.slice(trimmedHref.indexOf('?') + 1);
+            const params = new URLSearchParams(queryString);
+            const queryText = extractQuery(params);
+            if (queryText) {
+                return queryText;
+            }
+        }
+
+        if (trimmedHref.startsWith('#')) {
+            return safeFallback;
+        }
+        try {
+            if (trimmedHref.startsWith('term://')) {
+                return decodeURIComponent(trimmedHref.slice('term://'.length));
+            }
+            if (trimmedHref.startsWith('yomitan://')) {
+                const parsed = new URL(trimmedHref);
+                return (
+                    extractQuery(parsed.searchParams) ||
+                    decodeURIComponent(parsed.pathname.replace(/^\//, '')) ||
+                    safeFallback
+                );
+            }
+        } catch (err) {
+            console.warn('Failed to parse yomitan link', err);
+        }
+        try {
+            return decodeURIComponent(trimmedHref);
+        } catch (err) {
+            return safeFallback || trimmedHref;
+        }
+    }, []);
+
+    const handleDefinitionLink = useCallback(async (href: string, text: string) => {
+        const lookupText = cleanPunctuation(getLookupTextFromHref(href, text), true).trim();
+        if (!lookupText) {
+            return;
+        }
+
+        setDictPopup((prev) => ({
+            ...prev,
+            visible: true,
+            results: [],
+            isLoading: true,
+            systemLoading: false,
+            highlight: prev.highlight,
+        }));
+
+        try {
+            const results = await lookupYomitan(lookupText, 0, settings.resultGroupingMode);
+            if (results === 'loading') {
+                setDictPopup((prev) => ({
+                    ...prev,
+                    results: [],
+                    isLoading: false,
+                    systemLoading: true,
+                    highlight: prev.highlight,
+                }));
+                return;
+            }
+            setDictPopup((prev) => ({
+                ...prev,
+                results: results || [],
+                isLoading: false,
+                systemLoading: false,
+                highlight: prev.highlight,
+            }));
+        } catch (err) {
+            console.warn('Failed to lookup link definition', err);
+            setDictPopup((prev) => ({
+                ...prev,
+                results: [],
+                isLoading: false,
+                systemLoading: false,
+                highlight: prev.highlight,
+            }));
+        }
+    }, [getLookupTextFromHref, setDictPopup, settings.resultGroupingMode]);
 
     useLayoutEffect(() => {
         if (!dictPopup.visible) return;
@@ -589,7 +732,10 @@ export const YomitanPopup = () => {
                                             <div style={{ color: '#ddd' }}>
                                                 {def.content.map((jsonString, idx) => (
                                                     <div key={idx} style={{ marginBottom: '2px' }}>
-                                                        <StructuredContent contentString={jsonString} />
+                                                        <StructuredContent
+                                                            contentString={jsonString}
+                                                            onLinkClick={handleDefinitionLink}
+                                                        />
                                                     </div>
                                                 ))}
                                             </div>
