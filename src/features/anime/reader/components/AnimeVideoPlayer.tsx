@@ -37,6 +37,7 @@ import NoteAddIcon from '@mui/icons-material/NoteAdd';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
+import TextFieldsIcon from '@mui/icons-material/TextFields';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -101,6 +102,8 @@ type Props = {
     onVideoChange: (index: number) => void;
     subtitleTracks: SubtitleTrack[];
     subtitleTracksReady: boolean;
+    jimakuTitleOverride?: string | null;
+    onRequestJimakuTitleOverride?: () => void;
     onExit: () => void;
     title: string;
     animeId: string | number;
@@ -510,6 +513,8 @@ export const AnimeVideoPlayer = ({
     onVideoChange,
     subtitleTracks,
     subtitleTracksReady,
+    jimakuTitleOverride,
+    onRequestJimakuTitleOverride,
     onExit,
     title,
     animeId,
@@ -2910,28 +2915,69 @@ export const AnimeVideoPlayer = ({
         ],
     );
 
-    const subtitleMenuItems = useMemo(
-        () =>
-            subtitleOptions.map((option) => {
-                const isSelected = option.index === selectedSubtitleIndex;
-                return (
-                    <MenuItem
-                        key={option.index}
-                        selected={isSelected}
-                        onClick={(event) => {
-                            event.stopPropagation();
-                            markMenuInteraction();
-                            handleSubtitleChange(option.index);
-                            setSubtitleMenuAnchor(null);
+    const subtitleMenuItems = useMemo(() => {
+        const items = subtitleOptions.map((option) => {
+            const isSelected = option.index === selectedSubtitleIndex;
+            return (
+                <MenuItem
+                    key={option.index}
+                    selected={isSelected}
+                    className="subtitle-menu-item"
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        markMenuInteraction();
+                        handleSubtitleChange(option.index);
+                        setSubtitleMenuAnchor(null);
+                    }}
+                >
+                    <ListItemIcon sx={{ minWidth: 32 }}>{renderSelectionIcon(isSelected)}</ListItemIcon>
+                    <ListItemText
+                        primary={option.label}
+                        primaryTypographyProps={{
+                            sx: {
+                                whiteSpace: 'normal',
+                                wordBreak: 'break-word',
+                            },
                         }}
-                    >
-                        <ListItemIcon sx={{ minWidth: 32 }}>{renderSelectionIcon(isSelected)}</ListItemIcon>
-                        <ListItemText primary={option.label} />
-                    </MenuItem>
-                );
-            }),
-        [handleSubtitleChange, markMenuInteraction, renderSelectionIcon, selectedSubtitleIndex, subtitleOptions],
-    );
+                    />
+                </MenuItem>
+            );
+        });
+
+        const jimakuApiKey = settings.jimakuApiKey?.trim();
+        if (jimakuApiKey && onRequestJimakuTitleOverride) {
+            const secondaryText = jimakuTitleOverride?.trim()
+                ? `Current: ${jimakuTitleOverride.trim()}`
+                : 'Use current anime title';
+            items.push(
+                <MenuItem
+                    key="jimaku-title-override"
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        markMenuInteraction();
+                        onRequestJimakuTitleOverride();
+                        setSubtitleMenuAnchor(null);
+                    }}
+                >
+                    <ListItemIcon sx={{ minWidth: 32 }}>
+                        <TextFieldsIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText primary="Jimaku title" secondary={secondaryText} />
+                </MenuItem>,
+            );
+        }
+
+        return items;
+    }, [
+        handleSubtitleChange,
+        jimakuTitleOverride,
+        markMenuInteraction,
+        onRequestJimakuTitleOverride,
+        renderSelectionIcon,
+        selectedSubtitleIndex,
+        settings.jimakuApiKey,
+        subtitleOptions,
+    ]);
 
     const handlePlaybackChange = (rate: number) => {
         applyPlaybackRate(rate);
