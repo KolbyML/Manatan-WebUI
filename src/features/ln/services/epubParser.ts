@@ -24,7 +24,11 @@ type ProgressCallback = (progress: ParseProgress) => void;
  * Character count for Japanese text
  */
 const NOISE_REGEX = /[^0-9A-Z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]+/gimu;
-
+export interface TocItem {
+    label: string;
+    href: string;
+    chapterIndex: number;
+}
 function getCharacterCount(html: string): number {
     if (!html) return 0;
     const text = html.replace(/<[^>]*>/g, '');
@@ -80,23 +84,68 @@ export async function parseEpub(
         // --- Cover ---
         let coverBase64 = '';
         try {
+            // Strategy 1: EPUB 3 'properties' attribute
             let coverItem = opfDoc.querySelector('manifest > item[properties*="cover-image"]');
+
+            // Strategy 2: EPUB 2 <meta name="cover" content="item-id" />
+            if (!coverItem) {
+                const metaCover = opfDoc.querySelector('metadata > meta[name="cover"]');
+                if (metaCover) {
+                    const coverId = metaCover.getAttribute('content');
+                    if (coverId) {
+                        coverItem = opfDoc.querySelector(`manifest > item[id="${coverId}"]`);
+                    }
+                }
+            }
+
+            // Strategy 3: ID convention (id="cover")
             if (!coverItem) {
                 coverItem = opfDoc.querySelector('manifest > item[id="cover"]')
                     || opfDoc.querySelector('manifest > item[id="cover-image"]');
+            }
+
+            // Strategy 4: Search manifest for an href containing 'cover'
+            if (!coverItem) {
+                const allImages = opfDoc.querySelectorAll('manifest > item[media-type^="image/"]');
+                for (let i = 0; i < allImages.length; i++) {
+                    const href = allImages[i].getAttribute('href') || '';
+                    if (href.toLowerCase().includes('cover')) {
+                        coverItem = allImages[i];
+                        break;
+                    }
+                }
             }
 
             if (coverItem) {
                 const href = coverItem.getAttribute('href');
                 if (href) {
                     const fullPath = resolvePath(opfPath, href);
-                    const coverBlob = await content.file(fullPath)?.async('blob');
-                    if (coverBlob) {
-                        coverBase64 = await resizeCover(coverBlob);
+
+                    // Try exact match
+                    let file = content.file(fullPath);
+
+                    // Case-insensitive fallback (JSZip is case sensitive, EPUBs often aren't)
+                    if (!file) {
+                        const targetPath = fullPath.toLowerCase();
+                        // Search all files in zip
+                        for (const fileName of Object.keys(content.files)) {
+                            if (fileName.toLowerCase() === targetPath) {
+                                file = content.file(fileName);
+                                break;
+                            }
+                        }
+                    }
+
+                    if (file) {
+                        const coverBlob = await file.async('blob');
+                        if (coverBlob) {
+                            coverBase64 = await resizeCover(coverBlob);
+                        }
                     }
                 }
             }
-        } catch {
+        } catch (e) {
+            console.warn('Cover extraction failed:', e);
             // Cover extraction is optional
         }
 
@@ -123,7 +172,95 @@ export async function parseEpub(
         if (spineIds.length === 0) {
             return { success: false, error: 'No readable content in spine' };
         }
+        report('init', 5, 'Extracting Table of Contents...');
 
+        const tocItems: TocItem[] = [];
+
+        const ncxItem = opfDoc.querySelector('manifest > item[media-type="application/x-dtbncx+xml"]');
+
+        if (ncxItem) {
+            const ncxHref = ncxItem.getAttribute('href');
+            if (ncxHref) {
+                const ncxPath = resolvePath(opfPath, ncxHref);
+                const ncxContent = await content.file(ncxPath)?.async('string');
+                if (ncxContent) {
+                    const ncxDoc = new DOMParser().parseFromString(ncxContent, 'application/xml');
+
+                    const navPoints = ncxDoc.querySelectorAll('navPoint');
+
+                    navPoints.forEach((point) => {
+                        const label =
+                            point.querySelector('navLabel > text')?.textContent?.trim() ||
+                            point.querySelector('text')?.textContent?.trim() ||
+                            point.querySelector('navLabel')?.textContent?.trim() ||
+                            'Untitled';
+
+                        const src =
+                            point.querySelector('content')?.getAttribute('src') ||
+                            point.getAttribute('src') ||
+                            '';
+
+                        const cleanSrc = src.split('#')[0];
+
+                        if (!cleanSrc) return;
+
+                        let chapterIndex = -1;
+
+                        const manifestEntry = Object.entries(manifest).find(([_, val]) => {
+                            const normalizedManifest = val.href.split('#')[0];
+                            const normalizedClean = cleanSrc.split('#')[0];
+
+                            return normalizedManifest === normalizedClean ||
+                                normalizedManifest.endsWith(normalizedClean) ||
+                                normalizedClean.endsWith(normalizedManifest);
+                        });
+
+                        if (manifestEntry) {
+                            const id = manifestEntry[0];
+                            chapterIndex = spineIds.indexOf(id);
+                        }
+
+                        if (chapterIndex !== -1) {
+                            tocItems.push({ label, href: src, chapterIndex });
+                        }
+                    });
+                }
+            }
+        }
+
+        if (tocItems.length === 0) {
+            const navItem = opfDoc.querySelector('manifest > item[properties*="nav"]');
+            if (navItem) {
+                const navHref = navItem.getAttribute('href');
+                if (navHref) {
+                    const navPath = resolvePath(opfPath, navHref);
+                    const navContent = await content.file(navPath)?.async('string');
+                    if (navContent) {
+                        const navDoc = new DOMParser().parseFromString(navContent, 'text/html');
+                        const navLinks = navDoc.querySelectorAll('nav[epub\\:type="toc"] a, nav[*|type="toc"] a, nav#toc a');
+
+                        navLinks.forEach((link) => {
+                            const label = link.textContent?.trim() || 'Untitled';
+                            const href = link.getAttribute('href') || '';
+                            const cleanSrc = href.split('#')[0];
+
+                            if (!cleanSrc) return;
+
+                            const manifestEntry = Object.entries(manifest).find(([_, val]) =>
+                                val.href.split('#')[0] === cleanSrc
+                            );
+
+                            if (manifestEntry) {
+                                const chapterIndex = spineIds.indexOf(manifestEntry[0]);
+                                if (chapterIndex !== -1) {
+                                    tocItems.push({ label, href, chapterIndex });
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+        }
         report('images', 15, 'Processing images...');
 
         // --- Extract Images as Blobs ---
@@ -275,6 +412,7 @@ export async function parseEpub(
             isProcessing: false,
             stats,
             chapterCount: chapters.length,
+            toc: tocItems,
         };
 
         const parsedBook: LNParsedBook = {
