@@ -291,8 +291,6 @@ const AnkiButtons: React.FC<{
 
         const getFrequency = (): string => {
             const mode = settings.ankiFreqMode || 'lowest'; // Default to lowest
-
-                return getLowestFrequency();
             if (mode === 'lowest') return getLowestFrequency();
             if (mode === 'harmonic') return getHarmonicMeanFrequency();
 
@@ -307,6 +305,7 @@ const AnkiButtons: React.FC<{
         // --- GLOSSARY HTML BUILDER ---
         const buildGlossaryHtml = (dictionaryName?: string): string => {
             const glossaryEntries = dictionaryName
+                ? entry.glossary.filter((def) => def.dictionaryName === dictionaryName)
                 : entry.glossary;
             if (!glossaryEntries.length) return '';
             
@@ -316,6 +315,7 @@ const AnkiButtons: React.FC<{
                 ).join('');
                 
                 const dictHTML = `<span style="display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 0.75em; font-weight: bold; margin-right: 6px; color: #fff; background-color: #9b59b6; vertical-align: middle;">${def.dictionaryName}</span>`;
+                const contentHTML = def.content.map((c) => {
                     try {
                         const parsed = JSON.parse(c);
                         return `<div style="margin-bottom: 2px;">${generateHTML(parsed)}</div>`;

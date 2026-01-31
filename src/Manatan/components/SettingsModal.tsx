@@ -928,7 +928,8 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                                                             <div style={{ gridColumn: '1 / -1', fontSize: '0.85em', color: '#aaa' }}>
                                                                 Field where the sentence audio will be stored.
                                                             </div>
-                                                        )}
+                                                        </div>
+                                                    )}
 
                                                         {/* FREQUENCY MODE DROPDOWN - ADD THIS */}
                                                         {localSettings.enableYomitan &&
@@ -974,7 +975,6 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                                     </div>
                                 </div>
                             </div>
-                        </div>
                         </>
                     )}
 
