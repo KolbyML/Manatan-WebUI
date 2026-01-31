@@ -92,10 +92,17 @@ export const TextBox: React.FC<{
         };
     }, [contextMenu]);
 
-    const isVertical =
-        block.forcedOrientation === 'vertical' ||
-        (settings.textOrientation === 'smart' && block.tightBoundingBox.height > block.tightBoundingBox.width * 1.5) ||
-        settings.textOrientation === 'forceVertical';
+    const prefersVertical =
+        settings.yomitanLanguage === 'japanese' || settings.yomitanLanguage === 'chinese';
+    const trimmedText = block.text.replace(/\s+/g, '');
+    const charCount = trimmedText.length;
+    const verticalByGeometry = prefersVertical
+        && (charCount <= 1
+            ? block.tightBoundingBox.height > block.tightBoundingBox.width * 0.8
+            : block.tightBoundingBox.height > block.tightBoundingBox.width);
+    const isVertical = block.forcedOrientation
+        ? block.forcedOrientation === 'vertical'
+        : verticalByGeometry;
 
     const adj = settings.boundingBoxAdjustment || 0;
 

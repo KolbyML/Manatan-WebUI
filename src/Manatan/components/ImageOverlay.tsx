@@ -215,6 +215,7 @@ export const ImageOverlay: React.FC<{
             setOcrStatus(img.src, 'loading');
             let url = `/api/ocr/ocr?url=${encodeURIComponent(img.src)}`;
             url += `&add_space_on_merge=${settings.addSpaceOnMerge}`;
+            url += `&language=${encodeURIComponent(settings.yomitanLanguage)}`;
             if (serverSettings?.authUsername?.trim() && serverSettings?.authPassword?.trim()) {
                 url += `&user=${encodeURIComponent(serverSettings.authUsername.trim())}`;
                 url += `&pass=${encodeURIComponent(serverSettings.authPassword.trim())}`;
@@ -229,7 +230,15 @@ export const ImageOverlay: React.FC<{
             console.error("OCR Failed:", err);
             setOcrStatus(img.src, 'error');
         }
-    }, [img.src, ocrCache, setOcrStatus, updateOcrData, serverSettings, settings.addSpaceOnMerge]);
+    }, [
+        img.src,
+        ocrCache,
+        setOcrStatus,
+        updateOcrData,
+        serverSettings,
+        settings.addSpaceOnMerge,
+        settings.yomitanLanguage,
+    ]);
 
     useEffect(() => {
         if (!img.src) return;
@@ -284,7 +293,6 @@ export const ImageOverlay: React.FC<{
                 height: Math.max(b1.tightBoundingBox.y + b1.tightBoundingBox.height, b2.tightBoundingBox.y + b2.tightBoundingBox.height) - Math.min(b1.tightBoundingBox.y, b2.tightBoundingBox.y)
             },
             isMerged: true,
-            forcedOrientation: 'auto',
         };
         const newData = data.filter((_, i) => i !== idx1 && i !== idx2);
         newData.push(newBlock);

@@ -160,11 +160,16 @@ export const manageDictionary = async (action: 'Toggle' | 'Delete' | 'Reorder', 
 
 // --- OCR / CHAPTER API ---
 
-export const checkChapterStatus = async (baseUrl: string, creds?: AuthCredentials): Promise<ChapterStatus> => {
+export const checkChapterStatus = async (
+    baseUrl: string,
+    creds?: AuthCredentials,
+    language?: YomitanLanguage
+): Promise<ChapterStatus> => {
     try {
         const body: any = { base_url: baseUrl, context: 'Check Status' };
         if (creds?.user) body.user = creds.user;
         if (creds?.pass) body.pass = creds.pass;
+        if (language) body.language = language;
 
         const res = await apiRequest<any>('/api/ocr/is-chapter-preprocessed', {
             method: 'POST',
@@ -194,7 +199,13 @@ export const checkChapterStatus = async (baseUrl: string, creds?: AuthCredential
     }
 };
 
-export const preprocessChapter = async (baseUrl: string, chapterPath: string, creds?: AuthCredentials, addSpaceOnMerge?: boolean): Promise<void> => {
+export const preprocessChapter = async (
+    baseUrl: string,
+    chapterPath: string,
+    creds?: AuthCredentials,
+    addSpaceOnMerge?: boolean,
+    language?: YomitanLanguage
+): Promise<void> => {
     const mangaMatch = chapterPath.match(/\/manga\/(\d+)/);
     const chapterMatch = chapterPath.match(/\/chapter\/([\d.]+)/);
 
@@ -224,6 +235,7 @@ export const preprocessChapter = async (baseUrl: string, chapterPath: string, cr
     };
     if (creds?.user) body.user = creds.user;
     if (creds?.pass) body.pass = creds.pass;
+    if (language) body.language = language;
 
     await apiRequest('/api/ocr/preprocess-chapter', {
         method: 'POST',

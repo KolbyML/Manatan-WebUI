@@ -3,7 +3,7 @@ import { AnimeHotkey, DEFAULT_ANIME_HOTKEYS } from '@/Manatan/hotkeys/AnimeHotke
 export interface OcrBlock {
     text: string;
     tightBoundingBox: Rect;
-    forcedOrientation?: 'vertical' | 'horizontal' | 'auto';
+    forcedOrientation?: 'vertical' | 'horizontal';
     isMerged?: boolean;
 }
 
@@ -33,7 +33,6 @@ export interface Settings {
     tapZonePercent: number;
     jimakuApiKey?: string;
     yomitanLanguage: YomitanLanguage;
-    textOrientation: 'smart' | 'forceVertical' | 'forceHorizontal';
     debugMode: boolean;
     mobileMode: boolean;
     soloHoverMode: boolean;
@@ -170,7 +169,6 @@ export const DEFAULT_SETTINGS: Settings = {
     tapZonePercent: 30,
     jimakuApiKey: '',
     yomitanLanguage: 'japanese',
-    textOrientation: 'smart',
     debugMode: false,
     mobileMode: false,
     soloHoverMode: true,

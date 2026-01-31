@@ -949,13 +949,6 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                             <div style={{ gridColumn: '1 / -1', fontSize: '0.85em', color: '#aaa' }}>
                                 Controls overlay colors and highlight styling.
                             </div>
-                            <label htmlFor="textOrientation">Orientation</label>
-                            <select id="textOrientation" value={localSettings.textOrientation} onChange={(e) => handleChange('textOrientation', e.target.value)}>
-                                <option value="smart">Smart</option><option value="forceHorizontal">Horizontal</option><option value="forceVertical">Vertical</option>
-                            </select>
-                            <div style={{ gridColumn: '1 / -1', fontSize: '0.85em', color: '#aaa' }}>
-                                Preferred reading orientation for OCR text.
-                            </div>
                         </div>
 
                         <h4>Fine Tuning</h4>

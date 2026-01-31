@@ -79,6 +79,7 @@ export const ChapterListInjector: React.FC = () => {
                 chapterPath={urlPath} 
                 creds={credsRef.current} 
                 addSpaceOnMerge={settings.addSpaceOnMerge}
+                language={settings.yomitanLanguage}
             />
         );
     };
