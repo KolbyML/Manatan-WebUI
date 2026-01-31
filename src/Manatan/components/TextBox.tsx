@@ -63,6 +63,9 @@ export const TextBox: React.FC<{
     const [showCropper, setShowCropper] = useState(false);
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
     const ref = useRef<HTMLDivElement>(null);
+    const longPressTimer = useRef<number | null>(null);
+    const longPressTriggered = useRef(false);
+    const touchStartPoint = useRef<{ x: number; y: number } | null>(null);
 
     const justActivated = useRef(false);
     const dictPopupRef = useRef(dictPopup.visible);
@@ -80,12 +83,10 @@ export const TextBox: React.FC<{
                 setContextMenu(null);
             }
         };
-        window.addEventListener('mousedown', handleClose);
         window.addEventListener('resize', handleClose);
         window.addEventListener('scroll', handleClose, true);
         window.addEventListener('keydown', handleKey);
         return () => {
-            window.removeEventListener('mousedown', handleClose);
             window.removeEventListener('resize', handleClose);
             window.removeEventListener('scroll', handleClose, true);
             window.removeEventListener('keydown', handleKey);
@@ -410,13 +411,60 @@ export const TextBox: React.FC<{
         });
     };
 
+    const clearLongPressTimer = () => {
+        if (longPressTimer.current) {
+            window.clearTimeout(longPressTimer.current);
+            longPressTimer.current = null;
+        }
+    };
+
     const handleTouchStart = (e: React.TouchEvent) => {
         if (!settings.mobileMode) return;
+        const touch = e.touches[0];
+        if (!touch) return;
+        touchStartPoint.current = { x: touch.clientX, y: touch.clientY };
+        longPressTriggered.current = false;
+        clearLongPressTimer();
+        longPressTimer.current = window.setTimeout(() => {
+            longPressTriggered.current = true;
+            setContextMenu({ x: touch.clientX, y: touch.clientY });
+            setIsActive(true);
+            justActivated.current = true;
+            setTimeout(() => {
+                justActivated.current = false;
+            }, 500);
+        }, 550);
+
         if (!isActive) {
             setIsActive(true);
             justActivated.current = true;
-            setTimeout(() => justActivated.current = false, 500);
+            setTimeout(() => {
+                justActivated.current = false;
+            }, 500);
             if (e.cancelable) e.preventDefault();
+        }
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (!settings.mobileMode || !touchStartPoint.current) return;
+        const touch = e.touches[0];
+        if (!touch) return;
+        const dx = touch.clientX - touchStartPoint.current.x;
+        const dy = touch.clientY - touchStartPoint.current.y;
+        if (Math.hypot(dx, dy) > 12) {
+            clearLongPressTimer();
+            touchStartPoint.current = null;
+            longPressTriggered.current = false;
+        }
+    };
+
+    const handleTouchEnd = (e: React.TouchEvent) => {
+        if (!settings.mobileMode) return;
+        clearLongPressTimer();
+        touchStartPoint.current = null;
+        if (longPressTriggered.current) {
+            if (e.cancelable) e.preventDefault();
+            longPressTriggered.current = false;
         }
     };
 
@@ -607,6 +655,9 @@ export const TextBox: React.FC<{
                 }}
                 onClick={handleInteract}
                 onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                onTouchCancel={handleTouchEnd}
                 
                 onMouseEnter={() => setIsLocalHover(true)}
                 onMouseLeave={() => setIsLocalHover(false)}
@@ -646,46 +697,81 @@ export const TextBox: React.FC<{
                 {displayContent}
             </div>
             {menuPosition && createPortal(
-                <div
-                    onMouseDown={(event) => event.stopPropagation()}
-                    onClick={(event) => event.stopPropagation()}
-                    style={{
-                        position: 'fixed',
-                        top: menuPosition.y,
-                        left: menuPosition.x,
-                        zIndex: 2147483647,
-                        background: '#1a1d21',
-                        border: '1px solid rgba(255,255,255,0.12)',
-                        borderRadius: '8px',
-                        boxShadow: '0 10px 25px rgba(0,0,0,0.45)',
-                        padding: '6px',
-                        minWidth: '200px',
-                    }}
-                >
-                    <button
-                        type="button"
+                <>
+                    <div
+                        style={{
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            zIndex: 2147483646,
+                            backgroundColor: 'transparent',
+                            touchAction: 'none',
+                            cursor: 'default',
+                        }}
+                        onMouseDown={(event) => event.stopPropagation()}
                         onClick={(event) => {
                             event.stopPropagation();
-                            void handleCopyScreenshot();
+                            closeContextMenu();
                         }}
+                        onContextMenu={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            closeContextMenu();
+                        }}
+                        onTouchStart={(event) => {
+                            if (event.cancelable) event.preventDefault();
+                            event.stopPropagation();
+                        }}
+                        onTouchEnd={(event) => {
+                            if (event.cancelable) event.preventDefault();
+                            event.stopPropagation();
+                            closeContextMenu();
+                        }}
+                    />
+                    <div
+                        onMouseDown={(event) => event.stopPropagation()}
+                        onClick={(event) => event.stopPropagation()}
                         style={{
-                            width: '100%',
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#fff',
-                            textAlign: 'left',
-                            padding: '8px 10px',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
+                            position: 'fixed',
+                            top: menuPosition.y,
+                            left: menuPosition.x,
+                            zIndex: 2147483647,
+                            background: '#1a1d21',
+                            border: '1px solid rgba(255,255,255,0.12)',
+                            borderRadius: '8px',
+                            boxShadow: '0 10px 25px rgba(0,0,0,0.45)',
+                            padding: '6px',
+                            minWidth: '200px',
                         }}
                     >
-                        Copy screenshot to clipboard
-                    </button>
+                        <button
+                            type="button"
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                void handleCopyScreenshot();
+                                closeContextMenu();
+                            }}
+                            style={{
+                                width: '100%',
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#fff',
+                                textAlign: 'left',
+                                padding: '8px 10px',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                            }}
+                        >
+                            Copy screenshot to clipboard
+                        </button>
                     <button
                         type="button"
                         onClick={(event) => {
                             event.stopPropagation();
                             void handleCopySentence();
+                            closeContextMenu();
                         }}
                         style={{
                             width: '100%',
@@ -700,7 +786,28 @@ export const TextBox: React.FC<{
                     >
                         Copy sentence to clipboard
                     </button>
-                </div>,
+                    <button
+                        type="button"
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            onDelete(index);
+                            closeContextMenu();
+                        }}
+                        style={{
+                            width: '100%',
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#ff6b6b',
+                            textAlign: 'left',
+                            padding: '8px 10px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                        }}
+                    >
+                        Delete textbox
+                    </button>
+                </div>
+                </>,
                 document.body
             )}
             {showCropper && createPortal(
