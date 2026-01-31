@@ -60,7 +60,15 @@ import { useOCR } from '@/Manatan/context/OCRContext.tsx';
 import ManatanLogo from '@/Manatan/assets/manatan_logo.png';
 import { lookupYomitan } from '@/Manatan/utils/api.ts';
 import { buildSentenceFuriganaFromLookup } from '@/Manatan/utils/japaneseFurigana';
-import { DictionaryResult } from '@/Manatan/types.ts';
+import {
+    getWordAudioFilename,
+    getWordAudioSourceLabel,
+    getWordAudioSourceOptions,
+    playAudioFailClick,
+    playWordAudio,
+    resolveWordAudioUrl,
+} from '@/Manatan/utils/wordAudio';
+import { DictionaryResult, WordAudioSource, WordAudioSourceSelection } from '@/Manatan/types.ts';
 import { StructuredContent } from '@/Manatan/components/YomitanPopup.tsx';
 import { makeToast } from '@/base/utils/Toast.ts';
 import { MediaQuery } from '@/base/utils/MediaQuery.tsx';
@@ -626,6 +634,12 @@ export const AnimeVideoPlayer = ({
     const [dictionaryLoading, setDictionaryLoading] = useState(false);
     const [dictionarySystemLoading, setDictionarySystemLoading] = useState(false);
     const [dictionaryQuery, setDictionaryQuery] = useState('');
+    const [wordAudioMenuAnchor, setWordAudioMenuAnchor] = useState<{ top: number; left: number } | null>(null);
+    const [wordAudioMenuEntry, setWordAudioMenuEntry] = useState<DictionaryResult | null>(null);
+    const [wordAudioSelection, setWordAudioSelection] = useState<WordAudioSourceSelection>('auto');
+    const [wordAudioSelectionKey, setWordAudioSelectionKey] = useState<string | null>(null);
+    const [wordAudioAvailability, setWordAudioAvailability] = useState<Record<WordAudioSource, boolean> | null>(null);
+    const [wordAudioAutoAvailable, setWordAudioAutoAvailable] = useState<boolean | null>(null);
     const [isCaptureMode, setIsCaptureMode] = useState(false);
     const [dictionaryContext, setDictionaryContext] = useState<{
         sentence: string;
@@ -652,6 +666,7 @@ export const AnimeVideoPlayer = ({
     const resumePlaybackRef = useRef(false);
     const overlayVisibilityRef = useRef(false);
     const dictionaryOpenedByHoverRef = useRef(false);
+    const autoPlayWordAudioKeyRef = useRef<string | null>(null);
     const hoverLookupRef = useRef<{ cueKey: string; charOffset: number } | null>(null);
     const hoverLookupTimerRef = useRef<number | null>(null);
     const braveMutedRef = useRef(false);
@@ -668,9 +683,22 @@ export const AnimeVideoPlayer = ({
         (braveAudioFixMode === 'on' || (braveAudioFixMode === 'auto' && autoBraveFixDetected));
     const [isPageFullscreen, setIsPageFullscreen] = useState(false);
     const wrapperRef = useRef<HTMLDivElement | null>(null);
-    const isAnyMenuOpen = Boolean(videoMenuAnchor || subtitleMenuAnchor || speedMenuAnchor || episodeMenuAnchor);
+    const isAnyMenuOpen = Boolean(
+        videoMenuAnchor || subtitleMenuAnchor || speedMenuAnchor || episodeMenuAnchor || wordAudioMenuAnchor,
+    );
     const isFullscreenOverlay = isPageFullscreen || (fillHeight && isMobile);
     const menuContainer = isFullscreenOverlay ? wrapperRef.current ?? undefined : undefined;
+    const wordAudioOptions = useMemo(
+        () => getWordAudioSourceOptions(settings.yomitanLanguage),
+        [settings.yomitanLanguage],
+    );
+    const activeWordAudioSelection = useMemo(() => {
+        if (!wordAudioMenuEntry) {
+            return 'auto' as WordAudioSourceSelection;
+        }
+        const entryKey = getDictionaryEntryKey(wordAudioMenuEntry);
+        return wordAudioSelectionKey === entryKey ? wordAudioSelection : 'auto';
+    }, [getDictionaryEntryKey, wordAudioMenuEntry, wordAudioSelection, wordAudioSelectionKey]);
     const braveSegmentDurationRef = useRef<number | null>(null);
     const localSubtitleCuesRef = useRef<Map<string, SubtitleCue[]>>(new Map());
     const subtitleFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -2359,6 +2387,26 @@ export const AnimeVideoPlayer = ({
                       groupingMode: settings.resultGroupingMode,
                   })
                 : sentence;
+            const wordAudioField = Object.keys(map).find((key) => map[key] === 'Word Audio');
+            let wordAudioData:
+                | { url?: string; data?: string; filename: string; fields: string[] }
+                | undefined;
+            if (wordAudioField) {
+                const entryKey = getDictionaryEntryKey(entry);
+                const audioSelection = wordAudioSelectionKey === entryKey ? wordAudioSelection : 'auto';
+                const audioInfo = await resolveWordAudioUrl(
+                    entry,
+                    settings.yomitanLanguage,
+                    audioSelection,
+                );
+                if (audioInfo?.url) {
+                    wordAudioData = {
+                        url: audioInfo.url,
+                        filename: getWordAudioFilename(audioInfo.url),
+                        fields: [wordAudioField],
+                    };
+                }
+            }
 
             Object.entries(map).forEach(([ankiField, mapType]) => {
                 if (mapType === 'Target Word') fields[ankiField] = entry.headword;
@@ -2372,6 +2420,7 @@ export const AnimeVideoPlayer = ({
                 else if (mapType === 'Sentence Furigana') {
                     fields[ankiField] = sentenceFurigana;
                 }
+                else if (mapType === 'Word Audio') fields[ankiField] = '';
                 else if (typeof mapType === 'string') {
                     const name = getSingleGlossaryName(mapType);
                     if (name) {
@@ -2399,9 +2448,10 @@ export const AnimeVideoPlayer = ({
                 }
             }
 
-            let audioData:
-                | { data?: string; filename: string; fields: string[] }
-                | undefined;
+            const audioPayloads: Array<{ url?: string; data?: string; filename: string; fields: string[] }> = [];
+            if (wordAudioData) {
+                audioPayloads.push(wordAudioData);
+            }
             if (audioField && dictionaryContext?.audioStart != null && dictionaryContext?.audioEnd != null) {
                 const audioBase64 = await captureSentenceAudio(dictionaryContext.audioStart, dictionaryContext.audioEnd);
                 if (audioBase64) {
@@ -2409,18 +2459,26 @@ export const AnimeVideoPlayer = ({
                     const isOgg = audioBase64.startsWith('data:audio/ogg');
                     const isWav = audioBase64.startsWith('data:audio/wav');
                     const extension = isMp4 ? 'm4a' : isOgg ? 'ogg' : isWav ? 'wav' : 'webm';
-                    audioData = {
+                    audioPayloads.push({
                         data: audioBase64.split(';base64,')[1],
                         filename: `manatan_sentence_${Date.now()}.${extension}`,
                         fields: [audioField],
-                    };
+                    });
                 } else {
                     makeToast('Could not capture sentence audio from the video.', 'warning');
                 }
             }
 
             try {
-                const noteId = await addNote(url, settings.ankiDeck, settings.ankiModel, fields, tags, pictureData, audioData);
+                const noteId = await addNote(
+                    url,
+                    settings.ankiDeck,
+                    settings.ankiModel,
+                    fields,
+                    tags,
+                    pictureData,
+                    audioPayloads.length ? audioPayloads : undefined,
+                );
                 makeToast('Anki card added.', { variant: 'success', autoHideDuration: 1500 });
                 return noteId;
             } catch (error: any) {
@@ -2433,6 +2491,7 @@ export const AnimeVideoPlayer = ({
             captureSentenceAudio,
             captureVideoFrame,
             dictionaryContext,
+            getDictionaryEntryKey,
             settings.ankiConnectUrl,
             settings.ankiDeck,
             settings.ankiFieldMap,
@@ -2440,6 +2499,8 @@ export const AnimeVideoPlayer = ({
             settings.resultGroupingMode,
             settings.yomitanLanguage,
             showAlert,
+            wordAudioSelection,
+            wordAudioSelectionKey,
         ],
     );
 
@@ -2685,6 +2746,7 @@ export const AnimeVideoPlayer = ({
         setDictionaryVisible(false);
         setDictionaryContext(null);
         setHighlightedSubtitle(null);
+        closeWordAudioMenu();
         dictionaryOpenedByHoverRef.current = false;
         if (!video || !shouldResume) {
             setIsOverlayVisible(previousOverlayVisible);
@@ -2713,6 +2775,42 @@ export const AnimeVideoPlayer = ({
         }
         return null;
     }, []);
+
+    const handlePlayWordAudio = useCallback(
+        async (
+            entry: DictionaryResult,
+            selection?: WordAudioSourceSelection,
+            playFailSound = true,
+        ) => {
+            const entryKey = getDictionaryEntryKey(entry);
+            const resolvedSelection = selection || (wordAudioSelectionKey === entryKey ? wordAudioSelection : 'auto');
+            const playedSource = await playWordAudio(entry, settings.yomitanLanguage, resolvedSelection);
+            if (!playedSource && playFailSound) {
+                playAudioFailClick();
+            }
+        },
+        [getDictionaryEntryKey, settings.yomitanLanguage, wordAudioSelection, wordAudioSelectionKey],
+    );
+
+    const openWordAudioMenu = useCallback((event: React.MouseEvent, entry: DictionaryResult) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setWordAudioMenuEntry(entry);
+        setWordAudioMenuAnchor({ top: event.clientY, left: event.clientX });
+    }, []);
+
+    const closeWordAudioMenu = useCallback(() => {
+        setWordAudioMenuAnchor(null);
+        setWordAudioMenuEntry(null);
+    }, []);
+
+    const handleSelectWordAudioSource = useCallback(
+        (selection: WordAudioSourceSelection, entry: DictionaryResult) => {
+            setWordAudioSelection(selection);
+            setWordAudioSelectionKey(getDictionaryEntryKey(entry));
+        },
+        [getDictionaryEntryKey],
+    );
 
     const checkDuplicateForEntry = useCallback(
         async (entry: DictionaryResult) => {
@@ -2785,6 +2883,78 @@ export const AnimeVideoPlayer = ({
         settings.enableYomitan,
         checkDuplicateForEntry,
     ]);
+
+    useEffect(() => {
+        if (!dictionaryVisible) {
+            closeWordAudioMenu();
+            setWordAudioSelection('auto');
+            setWordAudioSelectionKey(null);
+        }
+    }, [closeWordAudioMenu, dictionaryVisible]);
+
+    useEffect(() => {
+        if (!wordAudioMenuAnchor) {
+            return;
+        }
+        const closeOnButtonClick = (event: MouseEvent) => {
+            const target = event.target as HTMLElement | null;
+            if (!target) {
+                return;
+            }
+            if (target.closest('[data-word-audio-menu="true"]')) {
+                return;
+            }
+            const button = target.closest('button,[role="button"]');
+            if (button) {
+                closeWordAudioMenu();
+            }
+        };
+        document.addEventListener('click', closeOnButtonClick, true);
+        return () => document.removeEventListener('click', closeOnButtonClick, true);
+    }, [closeWordAudioMenu, wordAudioMenuAnchor]);
+
+    useEffect(() => {
+        if (!wordAudioMenuEntry) {
+            setWordAudioAvailability(null);
+            setWordAudioAutoAvailable(null);
+            return;
+        }
+        let cancelled = false;
+        const entry = wordAudioMenuEntry;
+        const resolveAvailability = async () => {
+            const availability: Record<WordAudioSource, boolean> = {} as Record<WordAudioSource, boolean>;
+            for (const source of wordAudioOptions) {
+                const info = await resolveWordAudioUrl(entry, settings.yomitanLanguage, source);
+                availability[source] = Boolean(info?.url);
+            }
+            const autoAvailable =
+                wordAudioOptions.length > 0 && wordAudioOptions.some((source) => availability[source]);
+            if (!cancelled) {
+                setWordAudioAvailability(availability);
+                setWordAudioAutoAvailable(autoAvailable);
+            }
+        };
+        resolveAvailability();
+        return () => {
+            cancelled = true;
+        };
+    }, [settings.yomitanLanguage, wordAudioMenuEntry, wordAudioOptions]);
+
+    useEffect(() => {
+        if (!settings.autoPlayWordAudio) {
+            return;
+        }
+        if (!dictionaryVisible || !dictionaryResults.length) {
+            return;
+        }
+        const entry = dictionaryResults[0];
+        const key = getDictionaryEntryKey(entry);
+        if (autoPlayWordAudioKeyRef.current === key) {
+            return;
+        }
+        autoPlayWordAudioKeyRef.current = key;
+        handlePlayWordAudio(entry, undefined, false);
+    }, [dictionaryResults, dictionaryVisible, handlePlayWordAudio, settings.autoPlayWordAudio]);
 
     const handleAnkiOpen = useCallback(
         async (entry: DictionaryResult) => {
@@ -3768,7 +3938,10 @@ export const AnimeVideoPlayer = ({
                             overflowY: 'auto',
                             zIndex: 4,
                         }}
-                        onClick={(event) => event.stopPropagation()}
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            closeWordAudioMenu();
+                        }}
                     >
                         <Stack spacing={1}>
                             {dictionaryLoading && (
@@ -3821,111 +3994,129 @@ export const AnimeVideoPlayer = ({
                                                 );
                                             })}
                                         </Box>
-                                        {settings.ankiConnectEnabled && (
-                                            <Stack direction="row" spacing={1} alignItems="center">
-                                                {(!settings.ankiDeck || !settings.ankiModel) ? (
-                                                    <IconButton
-                                                        size="small"
-                                                        onClick={(event) => {
-                                                            event.stopPropagation();
-                                                            showAlert(
-                                                                'Anki Settings Missing',
-                                                                'Select a target Deck and Card Type in settings.',
-                                                            );
-                                                        }}
-                                                        title="Anki settings missing"
-                                                        sx={{ color: '#d04a4a' }}
-                                                        aria-label="Anki settings missing"
-                                                    >
-                                                        <CloseIcon fontSize="small" />
-                                                    </IconButton>
-                                                ) : (
-                                                    settings.enableYomitan
-                                                        ? (() => {
-                                                            const entryKey = getDictionaryEntryKey(entry);
-                                                            if (ankiActionPending[entryKey]) {
+                                        <Stack direction="row" spacing={1} alignItems="center">
+                                            {settings.ankiConnectEnabled && (
+                                                <>
+                                                    {(!settings.ankiDeck || !settings.ankiModel) ? (
+                                                        <IconButton
+                                                            size="small"
+                                                            onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                showAlert(
+                                                                    'Anki Settings Missing',
+                                                                    'Select a target Deck and Card Type in settings.',
+                                                                );
+                                                            }}
+                                                            title="Anki settings missing"
+                                                            sx={{ color: '#d04a4a' }}
+                                                            aria-label="Anki settings missing"
+                                                        >
+                                                            <CloseIcon fontSize="small" />
+                                                        </IconButton>
+                                                    ) : (
+                                                        settings.enableYomitan
+                                                            ? (() => {
+                                                                const entryKey = getDictionaryEntryKey(entry);
+                                                                if (ankiActionPending[entryKey]) {
+                                                                    return (
+                                                                        <IconButton
+                                                                            size="small"
+                                                                            disabled
+                                                                            title="Adding card..."
+                                                                            sx={{ color: '#888' }}
+                                                                            aria-label="Adding card"
+                                                                        >
+                                                                            <HourglassEmptyIcon fontSize="small" />
+                                                                        </IconButton>
+                                                                    );
+                                                                }
+                                                                const status = getAnkiEntryStatus(entry);
+                                                                if (status === 'exists') {
+                                                                    return (
+                                                                        <IconButton
+                                                                            size="small"
+                                                                            onClick={(event) => {
+                                                                                event.stopPropagation();
+                                                                                handleAnkiOpen(entry);
+                                                                            }}
+                                                                            title="Open in Anki"
+                                                                            sx={{ color: '#2ecc71' }}
+                                                                            aria-label="Open in Anki"
+                                                                        >
+                                                                            <MenuBookIcon fontSize="small" />
+                                                                        </IconButton>
+                                                                    );
+                                                                }
+                                                                if (status === 'missing') {
+                                                                    return (
+                                                                        <IconButton
+                                                                            size="small"
+                                                                            onClick={(event) => {
+                                                                                event.stopPropagation();
+                                                                                handleAnkiAdd(entry);
+                                                                            }}
+                                                                            title="Add to Anki"
+                                                                            sx={{ color: '#4fb0ff' }}
+                                                                            aria-label="Add to Anki"
+                                                                        >
+                                                                            <AddCircleOutlineIcon fontSize="small" />
+                                                                        </IconButton>
+                                                                    );
+                                                                }
                                                                 return (
                                                                     <IconButton
                                                                         size="small"
                                                                         disabled
-                                                                        title="Adding card..."
+                                                                        title="Checking duplicates"
                                                                         sx={{ color: '#888' }}
-                                                                        aria-label="Adding card"
+                                                                        aria-label="Checking duplicates"
                                                                     >
                                                                         <HourglassEmptyIcon fontSize="small" />
                                                                     </IconButton>
                                                                 );
-                                                            }
-                                                            const status = getAnkiEntryStatus(entry);
-                                                            if (status === 'exists') {
+                                                            })()
+                                                            : (() => {
+                                                                const entryKey = getDictionaryEntryKey(entry);
+                                                                const isPending = ankiActionPending[entryKey];
                                                                 return (
                                                                     <IconButton
                                                                         size="small"
                                                                         onClick={(event) => {
                                                                             event.stopPropagation();
-                                                                            handleAnkiOpen(entry);
+                                                                            if (isPending) {
+                                                                                return;
+                                                                            }
+                                                                            handleAnkiReplaceLast(entry);
                                                                         }}
-                                                                        title="Open in Anki"
-                                                                        sx={{ color: '#2ecc71' }}
-                                                                        aria-label="Open in Anki"
+                                                                        title={isPending ? 'Updating card...' : 'Update last card'}
+                                                                        sx={{ color: isPending ? '#888' : '#4fb0ff' }}
+                                                                        disabled={isPending}
+                                                                        aria-label={isPending ? 'Updating card' : 'Update last card'}
                                                                     >
-                                                                        <MenuBookIcon fontSize="small" />
+                                                                        <NoteAddIcon fontSize="small" />
                                                                     </IconButton>
                                                                 );
-                                                            }
-                                                            if (status === 'missing') {
-                                                                return (
-                                                                    <IconButton
-                                                                        size="small"
-                                                                        onClick={(event) => {
-                                                                            event.stopPropagation();
-                                                                            handleAnkiAdd(entry);
-                                                                        }}
-                                                                        title="Add to Anki"
-                                                                        sx={{ color: '#4fb0ff' }}
-                                                                        aria-label="Add to Anki"
-                                                                    >
-                                                                        <AddCircleOutlineIcon fontSize="small" />
-                                                                    </IconButton>
-                                                                );
-                                                            }
-                                                            return (
-                                                                <IconButton
-                                                                    size="small"
-                                                                    disabled
-                                                                    title="Checking duplicates"
-                                                                    sx={{ color: '#888' }}
-                                                                    aria-label="Checking duplicates"
-                                                                >
-                                                                    <HourglassEmptyIcon fontSize="small" />
-                                                                </IconButton>
-                                                            );
-                                                        })()
-                                                        : (() => {
-                                                            const entryKey = getDictionaryEntryKey(entry);
-                                                            const isPending = ankiActionPending[entryKey];
-                                                            return (
-                                                                <IconButton
-                                                                    size="small"
-                                                                    onClick={(event) => {
-                                                                        event.stopPropagation();
-                                                                        if (isPending) {
-                                                                            return;
-                                                                        }
-                                                                        handleAnkiReplaceLast(entry);
-                                                                    }}
-                                                                    title={isPending ? 'Updating card...' : 'Update last card'}
-                                                                    sx={{ color: isPending ? '#888' : '#4fb0ff' }}
-                                                                    disabled={isPending}
-                                                                    aria-label={isPending ? 'Updating card' : 'Update last card'}
-                                                                >
-                                                                    <NoteAddIcon fontSize="small" />
-                                                                </IconButton>
-                                                            );
-                                                        })()
-                                                )}
-                                            </Stack>
-                                        )}
+                                                            })()
+                                                    )}
+                                                </>
+                                            )}
+                                            <IconButton
+                                                size="small"
+                                                onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    handlePlayWordAudio(entry);
+                                                }}
+                                                onContextMenu={(event) => openWordAudioMenu(event, entry)}
+                                                title="Play word audio (right-click for sources)"
+                                                aria-label="Play word audio"
+                                                disabled={!wordAudioOptions.length}
+                                                sx={{
+                                                    color: wordAudioOptions.length ? '#7cc8ff' : '#555',
+                                                }}
+                                            >
+                                                <VolumeUpIcon fontSize="small" />
+                                            </IconButton>
+                                        </Stack>
                                     </Stack>
                                     {entry.frequencies && entry.frequencies.length > 0 && (
                                         <Box
@@ -4397,6 +4588,7 @@ export const AnimeVideoPlayer = ({
                         disablePortal={isFullscreenOverlay}
                         container={menuContainer}
                         MenuListProps={{
+                            'data-word-audio-menu': 'true',
                             onClick: (event) => event.stopPropagation(),
                         }}
                         PaperProps={{
@@ -4569,6 +4761,111 @@ export const AnimeVideoPlayer = ({
                             </MenuItem>
                         )}
                     </Menu>
+                    <Menu
+                        anchorReference="anchorPosition"
+                        anchorPosition={wordAudioMenuAnchor ?? undefined}
+                        open={Boolean(wordAudioMenuAnchor)}
+                        onClose={(event) => {
+                            event?.stopPropagation?.();
+                            markMenuInteraction();
+                            closeWordAudioMenu();
+                        }}
+                        disablePortal={isFullscreenOverlay}
+                        container={menuContainer}
+                        MenuListProps={{
+                            onClick: (event) => event.stopPropagation(),
+                        }}
+                        PaperProps={{
+                            sx: { minWidth: 220 },
+                        }}
+                        sx={{ zIndex: isPageFullscreen || (fillHeight && isMobile) ? 1601 : undefined }}
+                    >
+                        <MenuItem
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                if (wordAudioMenuEntry) {
+                                    handlePlayWordAudio(wordAudioMenuEntry, 'auto');
+                                }
+                                closeWordAudioMenu();
+                            }}
+                        >
+                            <ListItemText
+                                primary="Auto (first available)"
+                                primaryTypographyProps={{
+                                    sx: {
+                                        textDecoration: wordAudioAutoAvailable === false ? 'line-through' : 'none',
+                                        color: wordAudioAutoAvailable === false ? '#777' : undefined,
+                                    },
+                                }}
+                            />
+                            <IconButton
+                                size="small"
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    if (wordAudioMenuEntry) {
+                                        handleSelectWordAudioSource('auto', wordAudioMenuEntry);
+                                    }
+                                    closeWordAudioMenu();
+                                }}
+                                title="Use this source for cards"
+                                aria-label="Use this source for cards"
+                                sx={{
+                                    color:
+                                        wordAudioAutoAvailable === false
+                                            ? '#555'
+                                            : activeWordAudioSelection === 'auto'
+                                                ? '#f1c40f'
+                                                : '#777',
+                                }}
+                            >
+                                {renderSelectionIcon(activeWordAudioSelection === 'auto')}
+                            </IconButton>
+                        </MenuItem>
+                        {wordAudioOptions.map((source) => (
+                            <MenuItem
+                                key={source}
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    if (wordAudioMenuEntry) {
+                                        handlePlayWordAudio(wordAudioMenuEntry, source);
+                                    }
+                                    closeWordAudioMenu();
+                                }}
+                            >
+                                <ListItemText
+                                    primary={getWordAudioSourceLabel(source)}
+                                    primaryTypographyProps={{
+                                        sx: {
+                                            textDecoration: wordAudioAvailability?.[source] === false ? 'line-through' : 'none',
+                                            color: wordAudioAvailability?.[source] === false ? '#777' : undefined,
+                                        },
+                                    }}
+                                />
+                                <IconButton
+                                    size="small"
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        if (wordAudioMenuEntry) {
+                                            handleSelectWordAudioSource(source, wordAudioMenuEntry);
+                                        }
+                                        closeWordAudioMenu();
+                                    }}
+                                    title="Use this source for cards"
+                                    aria-label="Use this source for cards"
+                                    sx={{
+                                        color:
+                                            wordAudioAvailability?.[source] === false
+                                                ? '#555'
+                                                : activeWordAudioSelection === source
+                                                    ? '#f1c40f'
+                                                    : '#777',
+                                    }}
+                                >
+                                    {renderSelectionIcon(activeWordAudioSelection === source)}
+                                </IconButton>
+                            </MenuItem>
+                        ))}
+                    </Menu>
                     <Dialog
                         open={subtitleOffsetDialogOpen}
                         onClose={(_, reason) => {
@@ -4637,3 +4934,4 @@ export const AnimeVideoPlayer = ({
         </Box>
     );
 };
+

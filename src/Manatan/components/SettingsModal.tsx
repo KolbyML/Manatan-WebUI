@@ -98,6 +98,7 @@ const BASE_MAPPING_OPTIONS = [
     'Sentence',
     'Sentence Furigana',
     'Sentence Audio',
+    'Word Audio',
     'Image',
     'Furigana',
     'Reading',
@@ -615,20 +616,34 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                              <div style={{ paddingTop: '15px' }}>
                                  {/* Result Grouping Dropdown */}
                                  <div style={{ marginBottom: '15px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                                    <label htmlFor="groupingMode" style={{fontSize: '0.9em', color: '#ccc'}}>Result Grouping</label>
-                                     <select
-                                         id="groupingMode"
-                                         value={localSettings.resultGroupingMode || 'grouped'}
-                                         onChange={(e) => handleChange('resultGroupingMode', e.target.value)}
-                                         style={{ padding: '6px', borderRadius: '4px', border: '1px solid #444', background: '#222', color: 'white' }}
-                                     >
-                                         <option value="grouped">Group by Term</option>
-                                         <option value="flat">No Grouping</option>
-                                     </select>
-                                     <div style={{ fontSize: '0.85em', color: '#aaa' }}>
-                                         Group results by term or list every entry.
-                                     </div>
-                                  </div>
+                                     <label htmlFor="groupingMode" style={{fontSize: '0.9em', color: '#ccc'}}>Result Grouping</label>
+                                      <select
+                                          id="groupingMode"
+                                          value={localSettings.resultGroupingMode || 'grouped'}
+                                          onChange={(e) => handleChange('resultGroupingMode', e.target.value)}
+                                          style={{ padding: '6px', borderRadius: '4px', border: '1px solid #444', background: '#222', color: 'white' }}
+                                      >
+                                          <option value="grouped">Group by Term</option>
+                                          <option value="flat">No Grouping</option>
+                                      </select>
+                                      <div style={{ fontSize: '0.85em', color: '#aaa' }}>
+                                          Group results by term or list every entry.
+                                      </div>
+                                   </div>
+                                    <label style={checkboxLabelStyle}>
+                                        <input
+                                            type="checkbox"
+                                            checked={localSettings.autoPlayWordAudio}
+                                            onChange={(e) => handleChange('autoPlayWordAudio', e.target.checked)}
+                                            style={checkboxInputStyle}
+                                        />
+                                        <div>
+                                            Auto-play Word Audio
+                                            <div style={{ opacity: 0.6, fontSize: '0.85em' }}>
+                                                Plays word audio automatically when search results appear.
+                                            </div>
+                                        </div>
+                                    </label>
 
 
                                 {isInstalling && (

@@ -59,6 +59,15 @@ export type YomitanLanguage =
     | 'welsh'
     | 'cantonese';
 
+export type WordAudioSource =
+    | 'jpod101'
+    | 'language-pod-101'
+    | 'jisho'
+    | 'lingua-libre'
+    | 'wiktionary';
+
+export type WordAudioSourceSelection = WordAudioSource | 'auto';
+
 export interface ServerSettingsData { authUsername?: string; authPassword?: string; }
 
 export interface Settings {
@@ -84,6 +93,7 @@ export interface Settings {
     addSpaceOnMerge: boolean;
     enableDoubleClickEdit: boolean;
     disableStatusIcon: boolean;
+    autoPlayWordAudio: boolean;
     enableYomitan: boolean;
     deleteModifierKey: string;
     mergeModifierKey: string;
@@ -223,6 +233,7 @@ export const DEFAULT_SETTINGS: Settings = {
     addSpaceOnMerge: false,
     enableDoubleClickEdit: false,
     disableStatusIcon: false,
+    autoPlayWordAudio: false,
     enableYomitan: ENABLE_YOMITAN_DEFAULT,
     // Default to grouped
     resultGroupingMode: 'grouped', 

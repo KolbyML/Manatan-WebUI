@@ -4,7 +4,16 @@ import { useOCR } from '@/Manatan/context/OCRContext';
 import { findNotes, addNote, guiBrowse, imageUrlToBase64Webp } from '@/Manatan/utils/anki';
 import { cleanPunctuation, lookupYomitan } from '@/Manatan/utils/api';
 import { buildSentenceFuriganaFromLookup } from '@/Manatan/utils/japaneseFurigana';
-import { DictionaryResult } from '@/Manatan/types';
+import {
+    getWordAudioFilename,
+    getWordAudioSourceLabel,
+    getWordAudioSourceOptions,
+    playAudioFailClick,
+    playWordAudio,
+    resolveWordAudioUrl,
+} from '@/Manatan/utils/wordAudio';
+import { DictionaryResult, WordAudioSource, WordAudioSourceSelection } from '@/Manatan/types';
+import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import { CropperModal } from '@/Manatan/components/CropperModal';
 
 export const StructuredContent: React.FC<{
@@ -97,9 +106,11 @@ const tagStyle: React.CSSProperties = {
     color: '#fff', verticalAlign: 'middle', lineHeight: '1.2'
 };
 
-const AnkiButtons: React.FC<{ 
-    entry: DictionaryResult 
-}> = ({ entry }) => {
+const AnkiButtons: React.FC<{
+    entry: DictionaryResult;
+    wordAudioSelection: WordAudioSourceSelection;
+    wordAudioSelectionKey: string | null;
+}> = ({ entry, wordAudioSelection, wordAudioSelectionKey }) => {
     const { settings, dictPopup, showAlert } = useOCR();
     const [status, setStatus] = useState<'unknown' | 'loading' | 'missing' | 'exists'>('unknown');
     const [existingNoteId, setExistingNoteId] = useState<number | null>(null);
@@ -317,6 +328,26 @@ const AnkiButtons: React.FC<{
                   groupingMode: settings.resultGroupingMode,
               })
             : sentence;
+        const wordAudioField = Object.keys(map).find((key) => map[key] === 'Word Audio');
+        let wordAudioData:
+            | { url?: string; data?: string; filename: string; fields: string[] }
+            | undefined;
+        if (wordAudioField) {
+            const entryKey = `${entry.headword}::${entry.reading}`;
+            const audioSelection = wordAudioSelectionKey === entryKey ? wordAudioSelection : 'auto';
+            const audioInfo = await resolveWordAudioUrl(
+                entry,
+                settings.yomitanLanguage,
+                audioSelection,
+            );
+            if (audioInfo?.url) {
+                wordAudioData = {
+                    url: audioInfo.url,
+                    filename: getWordAudioFilename(audioInfo.url),
+                    fields: [wordAudioField],
+                };
+            }
+        }
         // Populate Fields
         for (const [ankiField, mapType] of Object.entries(map)) {
             if (mapType === 'Target Word') fields[ankiField] = entry.headword;
@@ -326,6 +357,7 @@ const AnkiButtons: React.FC<{
             else if (mapType === 'Frequency') fields[ankiField] = getLowestFrequency();
             else if (mapType === 'Sentence') fields[ankiField] = sentence;
             else if (mapType === 'Sentence Furigana') fields[ankiField] = sentenceFurigana;
+            else if (mapType === 'Word Audio') fields[ankiField] = '';
             else if (typeof mapType === 'string') {
                 const name = getSingleGlossaryName(mapType);
                 if (name) {
@@ -365,7 +397,8 @@ const AnkiButtons: React.FC<{
                 settings.ankiModel!, 
                 fields, 
                 Array.from(allTags), 
-                pictureData
+                pictureData,
+                wordAudioData
             );
 
             if (res) {
@@ -473,6 +506,16 @@ export const YomitanPopup = () => {
     const popupRef = useRef<HTMLDivElement>(null);
     const backdropRef = useRef<HTMLDivElement>(null);
     const [posStyle, setPosStyle] = useState<React.CSSProperties>({});
+    const [audioMenu, setAudioMenu] = useState<{
+        x: number;
+        y: number;
+        entry: DictionaryResult;
+    } | null>(null);
+    const [wordAudioSelection, setWordAudioSelection] = useState<WordAudioSourceSelection>('auto');
+    const [wordAudioSelectionKey, setWordAudioSelectionKey] = useState<string | null>(null);
+    const [wordAudioAvailability, setWordAudioAvailability] = useState<Record<WordAudioSource, boolean> | null>(null);
+    const [wordAudioAutoAvailable, setWordAudioAutoAvailable] = useState<boolean | null>(null);
+    const autoPlayKeyRef = useRef<string | null>(null);
     const getLookupTextFromHref = useCallback((href: string, fallback: string) => {
         const safeFallback = fallback.trim();
         if (!href) {
@@ -586,6 +629,112 @@ export const YomitanPopup = () => {
         }
     }, [getLookupTextFromHref, setDictPopup, settings.resultGroupingMode]);
 
+    const wordAudioOptions = useMemo(
+        () => getWordAudioSourceOptions(settings.yomitanLanguage),
+        [settings.yomitanLanguage],
+    );
+
+    const handlePlayWordAudio = useCallback(
+        async (
+            entry: DictionaryResult,
+            selection?: WordAudioSourceSelection,
+            playFailSound = true,
+        ) => {
+            const entryKey = `${entry.headword}::${entry.reading}`;
+            const resolvedSelection = selection || (wordAudioSelectionKey === entryKey ? wordAudioSelection : 'auto');
+            const playedSource = await playWordAudio(entry, settings.yomitanLanguage, resolvedSelection);
+            if (!playedSource && playFailSound) {
+                playAudioFailClick();
+            }
+        },
+        [settings.yomitanLanguage, wordAudioSelection, wordAudioSelectionKey],
+    );
+
+    useEffect(() => {
+        if (!settings.autoPlayWordAudio) {
+            return;
+        }
+        if (!dictPopup.visible || !dictPopup.results.length) {
+            return;
+        }
+        const entry = dictPopup.results[0];
+        const key = `${entry.headword}::${entry.reading}`;
+        if (autoPlayKeyRef.current === key) {
+            return;
+        }
+        autoPlayKeyRef.current = key;
+        handlePlayWordAudio(entry, undefined, false);
+    }, [dictPopup.results, dictPopup.visible, handlePlayWordAudio, settings.autoPlayWordAudio]);
+
+    useEffect(() => {
+        if (!audioMenu) {
+            return;
+        }
+        const closeOnButtonClick = (event: MouseEvent) => {
+            const target = event.target as HTMLElement | null;
+            if (!target) {
+                return;
+            }
+            if (target.closest('[data-word-audio-menu="true"]')) {
+                return;
+            }
+            const button = target.closest('button,[role="button"]');
+            if (button) {
+                setAudioMenu(null);
+            }
+        };
+        document.addEventListener('click', closeOnButtonClick, true);
+        return () => document.removeEventListener('click', closeOnButtonClick, true);
+    }, [audioMenu]);
+
+    useEffect(() => {
+        if (!audioMenu) {
+            setWordAudioAvailability(null);
+            setWordAudioAutoAvailable(null);
+            return;
+        }
+        let cancelled = false;
+        const entry = audioMenu.entry;
+        const resolveAvailability = async () => {
+            const availability: Record<WordAudioSource, boolean> = {} as Record<WordAudioSource, boolean>;
+            for (const source of wordAudioOptions) {
+                const info = await resolveWordAudioUrl(entry, settings.yomitanLanguage, source);
+                availability[source] = Boolean(info?.url);
+            }
+            const autoAvailable =
+                wordAudioOptions.length > 0 && wordAudioOptions.some((source) => availability[source]);
+            if (!cancelled) {
+                setWordAudioAvailability(availability);
+                setWordAudioAutoAvailable(autoAvailable);
+            }
+        };
+        resolveAvailability();
+        return () => {
+            cancelled = true;
+        };
+    }, [audioMenu, settings.yomitanLanguage, wordAudioOptions]);
+
+    useEffect(() => {
+        if (!dictPopup.visible) {
+            setWordAudioSelection('auto');
+            setWordAudioSelectionKey(null);
+        }
+    }, [dictPopup.visible]);
+
+    const openAudioMenu = useCallback((event: React.MouseEvent, entry: DictionaryResult) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setAudioMenu({ x: event.clientX, y: event.clientY, entry });
+    }, []);
+
+    const handleSelectWordAudioSource = useCallback(
+        (selection: WordAudioSourceSelection, entry: DictionaryResult) => {
+            setWordAudioSelection(selection);
+            setWordAudioSelectionKey(`${entry.headword}::${entry.reading}`);
+        },
+        [],
+    );
+
     useLayoutEffect(() => {
         if (!dictPopup.visible) return;
         const viewportW = window.visualViewport?.width || window.innerWidth;
@@ -647,6 +796,10 @@ export const YomitanPopup = () => {
 
     if (!dictPopup.visible) return null;
 
+    const audioMenuEntryKey = audioMenu ? `${audioMenu.entry.headword}::${audioMenu.entry.reading}` : null;
+    const activeWordAudioSelection =
+        audioMenuEntryKey && wordAudioSelectionKey === audioMenuEntryKey ? wordAudioSelection : 'auto';
+
     const popupStyle: React.CSSProperties = {
         position: 'fixed', zIndex: 2147483647, width: '340px', overflowY: 'auto',
         backgroundColor: '#1a1d21', color: '#eee', border: '1px solid #444',
@@ -677,7 +830,10 @@ export const YomitanPopup = () => {
                 style={popupStyle}
                 onMouseDown={e => e.stopPropagation()}
                 onTouchStart={e => e.stopPropagation()}
-                onClick={e => e.stopPropagation()}
+                onClick={e => {
+                    e.stopPropagation();
+                    setAudioMenu(null);
+                }}
                 onWheel={e => e.stopPropagation()}
             >
                 {dictPopup.isLoading && <div style={{ textAlign: 'center', padding: '20px', color: '#aaa' }}>Scanning...</div>}
@@ -719,8 +875,38 @@ export const YomitanPopup = () => {
                                     </div>
                                 )}
                             </div>
-                            
-                            {settings.ankiConnectEnabled && <AnkiButtons entry={entry} />}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                {settings.ankiConnectEnabled && (
+                                    <AnkiButtons
+                                        entry={entry}
+                                        wordAudioSelection={wordAudioSelection}
+                                        wordAudioSelectionKey={wordAudioSelectionKey}
+                                    />
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        handlePlayWordAudio(entry);
+                                    }}
+                                    onContextMenu={(event) => openAudioMenu(event, entry)}
+                                    title="Play word audio (right-click for sources)"
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        cursor: wordAudioOptions.length ? 'pointer' : 'not-allowed',
+                                        padding: '2px',
+                                        color: wordAudioOptions.length ? '#7cc8ff' : '#555',
+                                        lineHeight: 1,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                    }}
+                                    disabled={!wordAudioOptions.length}
+                                    aria-label="Play word audio"
+                                >
+                                    <VolumeUpIcon fontSize="small" />
+                                </button>
+                            </div>
                         </div>
 
                         {/* --- FREQUENCIES --- */}
@@ -794,6 +980,130 @@ export const YomitanPopup = () => {
                     <div style={{ padding: '10px', textAlign: 'center', color: '#777' }}>No results found</div>
                 )}
             </div>
+            {audioMenu && (
+                <div
+                    data-word-audio-menu="true"
+                    onMouseDown={(event) => event.stopPropagation()}
+                    onClick={(event) => event.stopPropagation()}
+                    style={{
+                        position: 'fixed',
+                        top: audioMenu.y,
+                        left: audioMenu.x,
+                        zIndex: 2147483647,
+                        background: '#1a1d21',
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        borderRadius: '8px',
+                        boxShadow: '0 10px 25px rgba(0,0,0,0.45)',
+                        padding: '6px',
+                        minWidth: '220px',
+                    }}
+                >
+                    <div style={{ fontSize: '0.75em', color: '#aaa', padding: '4px 8px' }}>
+                        Word audio sources
+                    </div>
+                    <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                            handlePlayWordAudio(audioMenu.entry, 'auto');
+                            setAudioMenu(null);
+                        }}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '6px 8px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            color: '#fff',
+                        }}
+                    >
+                        <span
+                            style={{
+                                textDecoration: wordAudioAutoAvailable === false ? 'line-through' : 'none',
+                                color: wordAudioAutoAvailable === false ? '#777' : '#fff',
+                            }}
+                        >
+                            Auto (first available)
+                        </span>
+                            <button
+                                type="button"
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleSelectWordAudioSource('auto', audioMenu.entry);
+                                    setAudioMenu(null);
+                                }}
+                                title="Use this source for cards"
+                                style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color:
+                                        wordAudioAutoAvailable === false
+                                            ? '#555'
+                                            : activeWordAudioSelection === 'auto'
+                                                ? '#f1c40f'
+                                                : '#777',
+                                    cursor: 'pointer',
+                                    fontSize: '0.9em',
+                                }}
+                        >
+                            ★
+                        </button>
+                    </div>
+                    {wordAudioOptions.map((source) => (
+                        <div
+                            key={source}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => {
+                                handlePlayWordAudio(audioMenu.entry, source);
+                                setAudioMenu(null);
+                            }}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '6px 8px',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                color: '#fff',
+                            }}
+                        >
+                            <span
+                                style={{
+                                    textDecoration: wordAudioAvailability?.[source] === false ? 'line-through' : 'none',
+                                    color: wordAudioAvailability?.[source] === false ? '#777' : '#fff',
+                                }}
+                            >
+                                {getWordAudioSourceLabel(source)}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleSelectWordAudioSource(source, audioMenu.entry);
+                                    setAudioMenu(null);
+                                }}
+                                title="Use this source for cards"
+                                style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color:
+                                        wordAudioAvailability?.[source] === false
+                                            ? '#555'
+                                            : activeWordAudioSelection === source
+                                                ? '#f1c40f'
+                                                : '#777',
+                                    cursor: 'pointer',
+                                    fontSize: '0.9em',
+                                }}
+                            >
+                                ★
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            )}
         </>,
         document.body
     );
