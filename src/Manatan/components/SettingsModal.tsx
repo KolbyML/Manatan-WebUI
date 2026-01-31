@@ -143,6 +143,27 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
             }
             const names = Array.from(new Set(list.map((dict) => dict.name).filter(Boolean)));
             setDictionaryNames(names);
+            setLocalSettings((prev) => {
+                if (!prev.ankiFieldMap) {
+                    return prev;
+                }
+                let changed = false;
+                const nextMap = { ...prev.ankiFieldMap };
+                Object.entries(nextMap).forEach(([field, value]) => {
+                    if (typeof value !== 'string') {
+                        return;
+                    }
+                    const name = getSingleGlossaryName(value);
+                    if (name && !names.includes(name)) {
+                        nextMap[field] = 'None';
+                        changed = true;
+                    }
+                });
+                if (!changed) {
+                    return prev;
+                }
+                return { ...prev, ankiFieldMap: nextMap };
+            });
         };
         fetchDictionaries();
         return () => {
@@ -157,24 +178,7 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
             label: `${SINGLE_GLOSSARY_PREFIX}${name}`,
         }));
 
-        const selectedGlossaryNames = new Set<string>();
-        Object.values(localSettings.ankiFieldMap || {}).forEach((value) => {
-            if (typeof value !== 'string') {
-                return;
-            }
-            const name = getSingleGlossaryName(value);
-            if (!name || dictionaryNames.includes(name)) {
-                return;
-            }
-            selectedGlossaryNames.add(name);
-        });
-
-        const missingGlossaryOptions = Array.from(selectedGlossaryNames).map((name) => ({
-            value: `${SINGLE_GLOSSARY_PREFIX}${name}`,
-            label: `${SINGLE_GLOSSARY_PREFIX}${name} (missing)`,
-        }));
-
-        return [...baseOptions, ...glossaryOptions, ...missingGlossaryOptions];
+        return [...baseOptions, ...glossaryOptions];
     }, [dictionaryNames, localSettings.ankiFieldMap]);
 
     const updateAnimeHotkey = useCallback((hotkey: AnimeHotkey, keys: string[]) => {
@@ -425,19 +429,49 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
     const handleImportClick = () => fileInputRef.current?.click();
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files?.[0]) {
-            const file = e.target.files[0];
+        const files = e.target.files ? Array.from(e.target.files) : [];
+        if (!files.length) {
+            return;
+        }
+
+        let successCount = 0;
+        let failCount = 0;
+        let lastMessage = '';
+
+        for (let i = 0; i < files.length; i += 1) {
+            const file = files[i];
             const formData = new FormData();
             formData.append('file', file);
             try {
-                showProgress(`Importing...`);
+                showProgress(`Importing ${i + 1}/${files.length}...`);
                 const res = await fetch('/api/yomitan/import', { method: 'POST', body: formData });
                 const json = await res.json();
-                closeDialog(); 
-                showAlert(json.status === 'ok' ? 'Success' : 'Failed', json.message);
-                if (json.status === 'ok') setDictManagerKey(p => p + 1);
-            } catch (err) { closeDialog(); showAlert('Error', String(err)); }
-            if (fileInputRef.current) fileInputRef.current.value = '';
+                lastMessage = json.message || lastMessage;
+                if (json.status === 'ok') {
+                    successCount += 1;
+                } else {
+                    failCount += 1;
+                }
+            } catch (err) {
+                failCount += 1;
+                lastMessage = String(err);
+            }
+        }
+
+        closeDialog();
+        if (successCount > 0) {
+            setDictManagerKey((p) => p + 1);
+        }
+        if (failCount === 0) {
+            showAlert('Success', `Imported ${successCount} dictionaries.`);
+        } else if (successCount === 0) {
+            showAlert('Failed', lastMessage || 'No dictionaries were imported.');
+        } else {
+            showAlert('Partial Success', `Imported ${successCount}. Failed ${failCount}. ${lastMessage || ''}`.trim());
+        }
+
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
         }
     };
 
@@ -459,7 +493,7 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
             <div className="ocr-modal settings-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="ocr-modal-content">
                     <h2>Settings</h2>
-                    <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept=".zip" onChange={handleFileChange} />
+                    <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept=".zip" multiple onChange={handleFileChange} />
 
                     {/* --- UPDATE BANNER --- */}
                     {updateStatus === 'downloading' && (
