@@ -626,7 +626,6 @@ export const AnimeVideoPlayer = ({
         false,
     );
     const [localSubtitleTracks, setLocalSubtitleTracks] = useState<SubtitleTrack[]>([]);
-    const isAnyMenuOpen = Boolean(videoMenuAnchor || subtitleMenuAnchor || speedMenuAnchor || episodeMenuAnchor);
     const lastSubtitleWarningRef = useRef<string | null>(null);
     const lastPlaybackWarningRef = useRef<number | null>(null);
     const subtitleRequestRef = useRef(0);
@@ -645,9 +644,12 @@ export const AnimeVideoPlayer = ({
         isBraveLinux &&
         enableBraveAudioFix &&
         (braveAudioFixMode === 'on' || (braveAudioFixMode === 'auto' && autoBraveFixDetected));
-    const braveSegmentDurationRef = useRef<number | null>(null);
     const [isPageFullscreen, setIsPageFullscreen] = useState(false);
     const wrapperRef = useRef<HTMLDivElement | null>(null);
+    const isAnyMenuOpen = Boolean(videoMenuAnchor || subtitleMenuAnchor || speedMenuAnchor || episodeMenuAnchor);
+    const isFullscreenOverlay = isPageFullscreen || (fillHeight && isMobile);
+    const menuContainer = isFullscreenOverlay ? wrapperRef.current ?? undefined : undefined;
+    const braveSegmentDurationRef = useRef<number | null>(null);
     const localSubtitleCuesRef = useRef<Map<string, SubtitleCue[]>>(new Map());
     const subtitleFileInputRef = useRef<HTMLInputElement | null>(null);
     const subtitleOffsetTapRef = useRef(0);
@@ -4180,6 +4182,8 @@ export const AnimeVideoPlayer = ({
                             markMenuInteraction();
                             setEpisodeMenuAnchor(null);
                         }}
+                        disablePortal={isFullscreenOverlay}
+                        container={menuContainer}
                         MenuListProps={{
                             onClick: (event) => event.stopPropagation(),
                         }}
@@ -4198,6 +4202,8 @@ export const AnimeVideoPlayer = ({
                             markMenuInteraction();
                             setVideoMenuAnchor(null);
                         }}
+                        disablePortal={isFullscreenOverlay}
+                        container={menuContainer}
                         MenuListProps={{
                             onClick: (event) => event.stopPropagation(),
                         }}
@@ -4213,6 +4219,8 @@ export const AnimeVideoPlayer = ({
                             markMenuInteraction();
                             setSubtitleMenuAnchor(null);
                         }}
+                        disablePortal={isFullscreenOverlay}
+                        container={menuContainer}
                         MenuListProps={{
                             onClick: (event) => event.stopPropagation(),
                         }}
@@ -4255,6 +4263,8 @@ export const AnimeVideoPlayer = ({
                             markMenuInteraction();
                             setSpeedMenuAnchor(null);
                         }}
+                        disablePortal={isFullscreenOverlay}
+                        container={menuContainer}
                         MenuListProps={{
                             onClick: (event) => event.stopPropagation(),
                         }}
