@@ -23,7 +23,8 @@ export type YomitanLanguage =
     | 'arabic'
     | 'spanish'
     | 'french'
-    | 'german';
+    | 'german'
+    | 'portuguese';
 
 export interface ServerSettingsData { authUsername?: string; authPassword?: string; }
 

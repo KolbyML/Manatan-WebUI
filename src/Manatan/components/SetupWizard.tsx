@@ -19,6 +19,7 @@ const languageOptions: { value: YomitanLanguage; label: string }[] = [
     { value: 'spanish', label: 'Spanish' },
     { value: 'french', label: 'French' },
     { value: 'german', label: 'German' },
+    { value: 'portuguese', label: 'Portuguese' },
 ];
 
 export const SetupWizard = () => {
