@@ -71,6 +71,8 @@ export interface Settings {
     boundingBoxAdjustment: number;
     subtitleFontSize: number;
     subtitleFontWeight: number;
+    animeSubtitleHoverLookup: boolean;
+    animeSubtitleHoverAutoResume: boolean;
     animeHotkeys: Record<AnimeHotkey, string[]>;
     tapZonePercent: number;
     jimakuApiKey?: string;
@@ -207,6 +209,8 @@ export const DEFAULT_SETTINGS: Settings = {
     boundingBoxAdjustment: 5,
     subtitleFontSize: 22,
     subtitleFontWeight: 600,
+    animeSubtitleHoverLookup: true,
+    animeSubtitleHoverAutoResume: false,
     animeHotkeys: DEFAULT_ANIME_HOTKEYS,
     tapZonePercent: 30,
     jimakuApiKey: '',

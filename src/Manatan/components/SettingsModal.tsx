@@ -902,6 +902,40 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                             <div style={{ gridColumn: '1 / -1', fontSize: '0.85em', color: '#aaa' }}>
                                 Controls the height of the top tap zone for play/pause.
                             </div>
+                            <div style={{ gridColumn: '1 / -1' }}>
+                                <div className="checkboxes">
+                                    <label style={checkboxLabelStyle}>
+                                        <input
+                                            type="checkbox"
+                                            checked={localSettings.animeSubtitleHoverLookup}
+                                            onChange={(e) => handleChange('animeSubtitleHoverLookup', e.target.checked)}
+                                            style={checkboxInputStyle}
+                                        />
+                                        <div>
+                                            Pause on subtitle hover
+                                            <div style={{ opacity: 0.6, fontSize: '0.85em' }}>
+                                                Hovering subtitles pauses playback and opens the dictionary.
+                                            </div>
+                                        </div>
+                                    </label>
+                                    {localSettings.animeSubtitleHoverLookup && (
+                                        <label style={checkboxLabelStyle}>
+                                            <input
+                                                type="checkbox"
+                                                checked={localSettings.animeSubtitleHoverAutoResume}
+                                                onChange={(e) => handleChange('animeSubtitleHoverAutoResume', e.target.checked)}
+                                                style={checkboxInputStyle}
+                                            />
+                                            <div>
+                                                Auto resume on hover exit
+                                                <div style={{ opacity: 0.6, fontSize: '0.85em' }}>
+                                                    Resume playback when you move the cursor off subtitles.
+                                                </div>
+                                            </div>
+                                        </label>
+                                    )}
+                                </div>
+                            </div>
                             <label htmlFor="jimakuApiKey">Jimaku API Key</label>
                             <input
                                 id="jimakuApiKey"

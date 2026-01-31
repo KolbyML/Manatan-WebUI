@@ -637,9 +637,13 @@ export const AnimeVideoPlayer = ({
     const lastSubtitleWarningRef = useRef<string | null>(null);
     const lastPlaybackWarningRef = useRef<number | null>(null);
     const subtitleRequestRef = useRef(0);
+    const dictionaryRequestRef = useRef(0);
     const menuInteractionRef = useRef(0);
     const resumePlaybackRef = useRef(false);
     const overlayVisibilityRef = useRef(false);
+    const dictionaryOpenedByHoverRef = useRef(false);
+    const hoverLookupRef = useRef<{ cueKey: string; charOffset: number } | null>(null);
+    const hoverLookupTimerRef = useRef<number | null>(null);
     const braveMutedRef = useRef(false);
     const braveVolumeRef = useRef<number | null>(null);
     const braveResetPendingRef = useRef(false);
@@ -2463,6 +2467,91 @@ export const AnimeVideoPlayer = ({
         return 0;
     };
 
+    const performSubtitleLookup = useCallback(
+        async (
+            text: string,
+            cueKey: string,
+            cueStart: number,
+            cueEnd: number,
+            charOffset: number,
+            source: 'click' | 'hover',
+        ) => {
+            if (wasPopupClosedRecently()) {
+                return;
+            }
+
+            const safeCharOffset = Math.min(Math.max(charOffset, 0), text.length);
+            const fallbackHighlightRange = getSubtitleHighlightRange(text, safeCharOffset);
+            setHighlightedSubtitle(null);
+
+            const applyDictionaryHighlight = (matchLen?: number | null) => {
+                if (matchLen && matchLen > 0) {
+                    const end = Math.min(text.length, safeCharOffset + matchLen);
+                    setHighlightedSubtitle({ key: cueKey, start: safeCharOffset, end });
+                    return;
+                }
+                if (fallbackHighlightRange) {
+                    setHighlightedSubtitle({ key: cueKey, ...fallbackHighlightRange });
+                } else {
+                    setHighlightedSubtitle(null);
+                }
+            };
+
+            const encoder = new TextEncoder();
+            const byteIndex = encoder.encode(text.substring(0, safeCharOffset)).length;
+
+            const video = videoRef.current;
+            if (!dictionaryVisible) {
+                resumePlaybackRef.current = Boolean(video && !video.paused);
+                overlayVisibilityRef.current = isOverlayVisible;
+            }
+            video?.pause();
+
+            const offsetSeconds = safeSubtitleOffsetMs / 1000;
+            const audioStart = Math.max(0, cueStart - offsetSeconds);
+            const audioEnd = Math.max(audioStart, cueEnd - offsetSeconds);
+            setDictionaryContext({ sentence: text, audioStart, audioEnd });
+            setDictionaryVisible(true);
+            setDictionaryQuery(text);
+            setDictionaryResults([]);
+            setDictionaryLoading(true);
+            setDictionarySystemLoading(false);
+            setIsOverlayVisible(false);
+            dictionaryOpenedByHoverRef.current = source === 'hover';
+
+            const requestId = dictionaryRequestRef.current + 1;
+            dictionaryRequestRef.current = requestId;
+
+            const results = await lookupYomitan(
+                text,
+                byteIndex,
+                settings.resultGroupingMode,
+                settings.yomitanLanguage
+            );
+            if (dictionaryRequestRef.current !== requestId) {
+                return;
+            }
+            if (results === 'loading') {
+                setDictionaryLoading(false);
+                setDictionarySystemLoading(true);
+            } else {
+                setDictionaryResults(results || []);
+                setDictionaryLoading(false);
+                setDictionarySystemLoading(false);
+                const matchLen = results?.[0]?.matchLen;
+                applyDictionaryHighlight(matchLen);
+            }
+        },
+        [
+            dictionaryVisible,
+            isOverlayVisible,
+            safeSubtitleOffsetMs,
+            settings.resultGroupingMode,
+            settings.yomitanLanguage,
+            wasPopupClosedRecently,
+        ],
+    );
+
     const handleSubtitleClick = async (
         event: React.MouseEvent<HTMLDivElement>,
         text: string,
@@ -2471,68 +2560,75 @@ export const AnimeVideoPlayer = ({
         cueEnd: number,
     ) => {
         event.stopPropagation();
-        if (wasPopupClosedRecently()) {
-            return;
-        }
-
+        dictionaryOpenedByHoverRef.current = false;
         const element = event.currentTarget;
         const charOffset = getSubtitleCharOffset(element, event.clientX, event.clientY);
+        await performSubtitleLookup(text, cueKey, cueStart, cueEnd, charOffset, 'click');
+    };
 
-        const safeCharOffset = Math.min(Math.max(charOffset, 0), text.length);
-        const fallbackHighlightRange = getSubtitleHighlightRange(text, safeCharOffset);
-        setHighlightedSubtitle(null);
+    const hoverLookupEnabled =
+        settings.animeSubtitleHoverLookup && settings.enableYomitan && !isMobile && isDesktopPlatform;
 
-        const applyDictionaryHighlight = (matchLen?: number | null) => {
-            if (matchLen && matchLen > 0) {
-                const end = Math.min(text.length, safeCharOffset + matchLen);
-                setHighlightedSubtitle({ key: cueKey, start: safeCharOffset, end });
+    const handleSubtitleMouseMove = useCallback(
+        (event: React.MouseEvent<HTMLDivElement>, cue: SubtitleCue) => {
+            if (!hoverLookupEnabled) {
                 return;
             }
-            if (fallbackHighlightRange) {
-                setHighlightedSubtitle({ key: cueKey, ...fallbackHighlightRange });
-            } else {
-                setHighlightedSubtitle(null);
+            if (dictionaryVisible && !dictionaryOpenedByHoverRef.current) {
+                return;
+            }
+            if (isAnyMenuOpen || wasPopupClosedRecently()) {
+                return;
+            }
+            const element = event.currentTarget;
+            const charOffset = getSubtitleCharOffset(element, event.clientX, event.clientY);
+            const safeCharOffset = Math.min(Math.max(charOffset, 0), cue.text.length);
+            const last = hoverLookupRef.current;
+            if (last && last.cueKey === cue.id && last.charOffset === safeCharOffset) {
+                return;
+            }
+            hoverLookupRef.current = { cueKey: cue.id, charOffset: safeCharOffset };
+            if (hoverLookupTimerRef.current !== null) {
+                window.clearTimeout(hoverLookupTimerRef.current);
+            }
+            hoverLookupTimerRef.current = window.setTimeout(() => {
+                hoverLookupTimerRef.current = null;
+                if (!hoverLookupEnabled) {
+                    return;
+                }
+                if (dictionaryVisible && !dictionaryOpenedByHoverRef.current) {
+                    return;
+                }
+                performSubtitleLookup(cue.text, cue.id, cue.start, cue.end, safeCharOffset, 'hover');
+            }, 120);
+        },
+        [
+            dictionaryVisible,
+            hoverLookupEnabled,
+            isAnyMenuOpen,
+            performSubtitleLookup,
+            wasPopupClosedRecently,
+        ],
+    );
+
+    const handleSubtitleMouseLeave = useCallback(() => {
+        if (hoverLookupTimerRef.current !== null) {
+            window.clearTimeout(hoverLookupTimerRef.current);
+            hoverLookupTimerRef.current = null;
+        }
+        hoverLookupRef.current = null;
+        if (hoverLookupEnabled && settings.animeSubtitleHoverAutoResume && dictionaryOpenedByHoverRef.current) {
+            resumeFromDictionary();
+        }
+    }, [hoverLookupEnabled, settings.animeSubtitleHoverAutoResume]);
+
+    useEffect(() => {
+        return () => {
+            if (hoverLookupTimerRef.current !== null) {
+                window.clearTimeout(hoverLookupTimerRef.current);
             }
         };
-
-        const encoder = new TextEncoder();
-        const byteIndex = encoder.encode(text.substring(0, safeCharOffset)).length;
-
-        const video = videoRef.current;
-        if (!dictionaryVisible) {
-            resumePlaybackRef.current = Boolean(video && !video.paused);
-            overlayVisibilityRef.current = isOverlayVisible;
-        }
-        video?.pause();
-
-        const offsetSeconds = safeSubtitleOffsetMs / 1000;
-        const audioStart = Math.max(0, cueStart - offsetSeconds);
-        const audioEnd = Math.max(audioStart, cueEnd - offsetSeconds);
-        setDictionaryContext({ sentence: text, audioStart, audioEnd });
-        setDictionaryVisible(true);
-        setDictionaryQuery(text);
-        setDictionaryResults([]);
-        setDictionaryLoading(true);
-        setDictionarySystemLoading(false);
-        setIsOverlayVisible(false);
-
-        const results = await lookupYomitan(
-            text,
-            byteIndex,
-            settings.resultGroupingMode,
-            settings.yomitanLanguage
-        );
-        if (results === 'loading') {
-            setDictionaryLoading(false);
-            setDictionarySystemLoading(true);
-        } else {
-            setDictionaryResults(results || []);
-            setDictionaryLoading(false);
-            setDictionarySystemLoading(false);
-            const matchLen = results?.[0]?.matchLen;
-            applyDictionaryHighlight(matchLen);
-        }
-    };
+    }, []);
 
     const togglePlay = useCallback(() => {
         const video = videoRef.current;
@@ -2557,6 +2653,8 @@ export const AnimeVideoPlayer = ({
         const previousOverlayVisible = overlayVisibilityRef.current;
         setDictionaryVisible(false);
         setDictionaryContext(null);
+        setHighlightedSubtitle(null);
+        dictionaryOpenedByHoverRef.current = false;
         if (!video || !shouldResume) {
             setIsOverlayVisible(previousOverlayVisible);
             return;
@@ -3594,7 +3692,9 @@ export const AnimeVideoPlayer = ({
                                 maxWidth: '100%',
                                 WebkitTapHighlightColor: 'transparent',
                             }}
-                onClick={(event) => handleSubtitleClick(event, cue.text, cue.id, cue.start, cue.end)}
+                            onClick={(event) => handleSubtitleClick(event, cue.text, cue.id, cue.start, cue.end)}
+                            onMouseMove={(event) => handleSubtitleMouseMove(event, cue)}
+                            onMouseLeave={() => handleSubtitleMouseLeave()}
                         >
                             <Typography
                                 variant="body1"
