@@ -108,6 +108,8 @@ export interface Settings {
     ankiFieldMap?: Record<string, string>;
     ankiCheckDuplicates?: boolean;
     skipAnkiUpdateConfirm: boolean;
+    showHarmonicMeanFreq: boolean;
+    ankiFreqMode: string;
     // Light Novel Settings
     lnFontSize: number;
     lnLineHeight: number;
@@ -258,6 +260,8 @@ export const DEFAULT_SETTINGS: Settings = {
     ankiFieldMap: {},
     ankiCheckDuplicates: true,
     skipAnkiUpdateConfirm: false,
+    showHarmonicMeanFreq: false,
+    ankiFreqMode: 'lowest',
     // LN Defaults
     lnFontSize: 16,
     lnLineHeight: 1.6,

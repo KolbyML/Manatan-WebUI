@@ -7,14 +7,7 @@ import { bindTrigger, usePopupState } from 'material-ui-popup-state/hooks';
 import { useOCR } from '@/Manatan/context/OCRContext';
 import { AppStorage } from '@/lib/storage/AppStorage.ts';
 import { COLOR_THEMES, DEFAULT_SETTINGS } from '@/Manatan/types';
-import {
-    apiRequest,
-    getAppVersion,
-    checkForUpdates,
-    triggerAppUpdate,
-    installAppUpdate,
-    getDictionaries,
-} from '@/Manatan/utils/api';
+import { apiRequest, getAppVersion, checkForUpdates, triggerAppUpdate, installAppUpdate, getFrequencyDictionaries } from '@/Manatan/utils/api';
 import { DictionaryManager } from './DictionaryManager';
 import { getAnkiVersion, getDeckNames, getModelNames, getModelFields } from '@/Manatan/utils/anki';
 import { ResetButton } from '@/base/components/buttons/ResetButton.tsx';
@@ -181,6 +174,7 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
 
         return [...baseOptions, ...glossaryOptions];
     }, [dictionaryNames, localSettings.ankiFieldMap]);
+    const [availableFreqDicts, setAvailableFreqDicts] = useState<string[]>([]);
 
     const updateAnimeHotkey = useCallback((hotkey: AnimeHotkey, keys: string[]) => {
         setLocalSettings((prev) => ({
@@ -208,6 +202,13 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
     const [updateAvailable, setUpdateAvailable] = useState<any>(null);
     const [updateStatus, setUpdateStatus] = useState<string>('idle');
 
+    useEffect(() => {
+        const fetchFreqDicts = async () => {
+            const dicts = await getFrequencyDictionaries();
+            setAvailableFreqDicts(dicts);
+        };
+        fetchFreqDicts();
+    }, []);
     // --- ANKI EFFECT ---
     const fetchAnkiData = async () => {
         if (!localSettings.ankiConnectEnabled) return;
@@ -645,6 +646,20 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                                         </div>
                                     </label>
 
+                                <label style={checkboxLabelStyle}>
+                                    <input
+                                        type="checkbox"
+                                        checked={localSettings.showHarmonicMeanFreq}
+                                        onChange={e => handleChange('showHarmonicMeanFreq', e.target.checked)}
+                                        style={checkboxInputStyle}
+                                    />
+                                    <div>
+                                        Show Harmonic Mean Frequency
+                                        <div style={{ opacity: 0.6, fontSize: '0.85em' }}>
+                                            Displays a single harmonic mean value instead of individual frequency dictionaries.
+                                        </div>
+                                    </div>
+                                </label>
 
                                 {isInstalling && (
                                     <div style={{ fontSize: '0.9em', color: '#aaa', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -913,13 +928,50 @@ export const SettingsModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                                                             <div style={{ gridColumn: '1 / -1', fontSize: '0.85em', color: '#aaa' }}>
                                                                 Field where the sentence audio will be stored.
                                                             </div>
+                                                        )}
 
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </>
-                                    )}
+                                                        {/* FREQUENCY MODE DROPDOWN - ADD THIS */}
+                                                        {localSettings.enableYomitan &&
+                                                            Object.values(localSettings.ankiFieldMap || {}).includes('Frequency') && (
+                                                                <div style={{
+                                                                    marginTop: '20px',
+                                                                    paddingTop: '15px',
+                                                                    borderTop: '1px solid rgba(255,255,255,0.1)'
+                                                                }}>
+                                                                    <h4 style={{ marginTop: 0, marginBottom: '10px', color: '#ddd' }}>
+                                                                        Frequency Export Mode
+                                                                    </h4>
+                                                                    <div className="grid">
+                                                                        <label htmlFor="ankiFreqMode">Frequency Value</label>
+                                                                        <select
+                                                                            id="ankiFreqMode"
+                                                                            value={localSettings.ankiFreqMode || 'lowest'}
+                                                                            onChange={(e) => handleChange('ankiFreqMode', e.target.value)}
+                                                                            style={{
+                                                                                padding: '6px',
+                                                                                borderRadius: '4px',
+                                                                                border: '1px solid #444',
+                                                                                background: '#222',
+                                                                                color: 'white'
+                                                                            }}
+                                                                        >
+                                                                            <option value="lowest">Lowest Frequency</option>
+                                                                            <option value="harmonic">Harmonic Mean</option>
+                                                                            {availableFreqDicts.map(dict => (
+                                                                                <option key={dict} value={dict}>{dict}</option>
+                                                                            ))}
+                                                                        </select>
+                                                                        <div style={{ gridColumn: '1 / -1', fontSize: '0.85em', color: '#aaa' }}>
+                                                                            Choose which frequency value to export to Anki.
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>

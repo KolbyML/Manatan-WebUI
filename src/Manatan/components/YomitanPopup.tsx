@@ -282,9 +282,44 @@ const AnkiButtons: React.FC<{
                 : entry.glossary;
             if (!glossaryEntries.length) {
                 return '';
+        const getHarmonicMeanFrequency = (): string => {
+            if (!entry.frequencies || entry.frequencies.length === 0) return '';
+
+            const numbers = entry.frequencies
+                .map(f => {
+                    const cleaned = f.value.replace(/[^\d]/g, '');
+                    return parseInt(cleaned, 10);
+                })
+                .filter(n => !isNaN(n) && n > 0);
+
+            if (numbers.length === 0) return '';
+
+            const sumOfReciprocals = numbers.reduce((sum, n) => sum + (1 / n), 0);
+            return Math.round(numbers.length / sumOfReciprocals).toString();
+        };
+
+        const getFrequency = (): string => {
+            const mode = settings.ankiFreqMode || 'lowest';
+
+            if (mode === 'lowest') {
+                return getLowestFrequency();
             }
             return glossaryEntries.map((def, idx) => {
             const tagsHTML = def.tags.map(t => 
+
+            if (mode === 'harmonic') {
+                return getHarmonicMeanFrequency();
+            }
+
+            // Specific dictionary
+            const freqEntry = entry.frequencies?.find(f => f.dictionaryName === mode);
+            if (freqEntry) {
+                return freqEntry.value;
+            }
+
+            // Fallback to lowest if dictionary not found
+            return getLowestFrequency();
+        };
                 `<span style="display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 0.75em; font-weight: bold; margin-right: 6px; color: #fff; background-color: #666; vertical-align: middle;">${t}</span>`
             ).join('');
             
@@ -354,7 +389,6 @@ const AnkiButtons: React.FC<{
             else if (mapType === 'Reading') fields[ankiField] = entry.reading;
             else if (mapType === 'Furigana') fields[ankiField] = generateAnkiFurigana(entry.furigana || []);
             else if (mapType === 'Definition' || mapType === 'Glossary') fields[ankiField] = buildGlossaryHtml();
-            else if (mapType === 'Frequency') fields[ankiField] = getLowestFrequency();
             else if (mapType === 'Sentence') fields[ankiField] = sentence;
             else if (mapType === 'Sentence Furigana') fields[ankiField] = sentenceFurigana;
             else if (mapType === 'Word Audio') fields[ankiField] = '';
@@ -364,6 +398,7 @@ const AnkiButtons: React.FC<{
                     fields[ankiField] = buildGlossaryHtml(name);
                 }
             }
+            else if (mapType === 'Frequency') fields[ankiField] = getFrequency();
         }
 
         try {
@@ -516,6 +551,42 @@ export const YomitanPopup = () => {
     const [wordAudioAvailability, setWordAudioAvailability] = useState<Record<WordAudioSource, boolean> | null>(null);
     const [wordAudioAutoAvailable, setWordAudioAutoAvailable] = useState<boolean | null>(null);
     const autoPlayKeyRef = useRef<string | null>(null);
+
+    const calculateHarmonicMean = useCallback((frequencies: any[]): number | null => {
+        if (!frequencies || frequencies.length === 0) return null;
+
+        const numbers = frequencies
+            .map(f => {
+                const cleaned = f.value.replace(/[^\d]/g, '');
+                return parseInt(cleaned, 10);
+            })
+            .filter(n => !isNaN(n) && n > 0);
+
+        if (numbers.length === 0) return null;
+
+        const sumOfReciprocals = numbers.reduce((sum, n) => sum + (1 / n), 0);
+        return Math.round(numbers.length / sumOfReciprocals);
+    }, []);
+
+    const processedEntries = useMemo(() => {
+        if (!settings.showHarmonicMeanFreq) return dictPopup.results;
+
+        return dictPopup.results.map(entry => {
+            if (!entry.frequencies || entry.frequencies.length === 0) return entry;
+
+            const harmonicMean = calculateHarmonicMean(entry.frequencies);
+            if (harmonicMean === null) return entry;
+
+            return {
+                ...entry,
+                frequencies: [{
+                    dictionaryName: 'Harmonic Mean',
+                    value: harmonicMean.toString()
+                }]
+            };
+        });
+    }, [dictPopup.results, settings.showHarmonicMeanFreq, calculateHarmonicMean]);
+
     const getLookupTextFromHref = useCallback((href: string, fallback: string) => {
         const safeFallback = fallback.trim();
         if (!href) {
