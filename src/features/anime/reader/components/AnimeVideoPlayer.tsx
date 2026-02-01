@@ -370,16 +370,25 @@ const parseSubtitles = (input: string, url: string): SubtitleCue[] => {
     return parseVttOrSrt(trimmed);
 };
 
+const splitTagString = (tag: string): string[] =>
+    tag
+        .split(/\s+/)
+        .map((part) => part.trim())
+        .filter(Boolean);
+
+const normalizeTagList = (tags: string[]): string[] =>
+    tags.flatMap((tag) => splitTagString(tag));
+
 const buildAnkiTags = (entry: DictionaryResult): string[] => {
     const allTags = new Set(['manatan']);
-    entry.glossary?.forEach((def) => def.tags?.forEach((tag) => allTags.add(tag)));
+    entry.glossary?.forEach((def) => normalizeTagList(def.tags ?? []).forEach((tag) => allTags.add(tag)));
     entry.termTags?.forEach((tag: any) => {
         if (typeof tag === 'string') {
-            allTags.add(tag);
+            splitTagString(tag).forEach((item) => allTags.add(item));
             return;
         }
         if (tag && typeof tag === 'object' && tag.name) {
-            allTags.add(tag.name);
+            splitTagString(tag.name).forEach((item) => allTags.add(item));
         }
     });
     return Array.from(allTags);
@@ -452,9 +461,17 @@ const buildDefinitionHtml = (entry: DictionaryResult, dictionaryName?: string): 
         if (node.type === 'structured-content') {
             return generateHTML(node.content);
         }
+        if (node?.data?.content === 'attribution') {
+            return '';
+        }
 
-        const { tag, content, style, href } = node;
+        const { tag, content, style, href, data } = node;
         const customStyle = styleToString(style);
+        const classNames = typeof data?.class === 'string' ? data.class.split(/\s+/) : [];
+        const isTagClass = classNames.includes('tag');
+        const tagClassStyle = isTagClass
+            ? 'display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 0.75em; font-weight: bold; margin-right: 6px; color: #fff; background-color: #666; vertical-align: middle; line-height: 1.2;'
+            : '';
 
         if (tag === 'ul') {
             return `<ul style="padding-left: 20px; margin: 2px 0; list-style-type: disc;${customStyle}">${generateHTML(content)}</ul>`;
@@ -478,7 +495,7 @@ const buildDefinitionHtml = (entry: DictionaryResult, dictionaryName?: string): 
             return `<td style="border: 1px solid #777; padding: 2px 8px; text-align: center;${customStyle}">${generateHTML(content)}</td>`;
         }
         if (tag === 'span') {
-            return `<span style="${customStyle}">${generateHTML(content)}</span>`;
+            return `<span style="${tagClassStyle}${customStyle}">${generateHTML(content)}</span>`;
         }
         if (tag === 'div') {
             return `<div style="${customStyle}">${generateHTML(content)}</div>`;
@@ -498,13 +515,12 @@ const buildDefinitionHtml = (entry: DictionaryResult, dictionaryName?: string): 
     }
     return glossaryEntries
         .map((def, idx) => {
-            const tagsHTML = (def.tags ?? [])
-                .map(
-                    (tag) =>
-                        `<span style="display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 0.75em; font-weight: bold; margin-right: 6px; color: #fff; background-color: #666; vertical-align: middle;">${tag}</span>`,
-                )
-                .join('');
+            const tagsHTML = normalizeTagList(def.tags ?? []).map(
+                (tag) =>
+                    `<span style="display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 0.75em; font-weight: bold; margin-right: 6px; color: #fff; background-color: #666; vertical-align: middle;">${tag}</span>`,
+            );
             const dictHTML = `<span style="display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 0.75em; font-weight: bold; margin-right: 6px; color: #fff; background-color: #9b59b6; vertical-align: middle;">${def.dictionaryName}</span>`;
+            const headerHTML = [...tagsHTML, dictHTML].join(' ');
             const contentHTML = def.content
                 .map((content) => {
                     try {
@@ -519,7 +535,7 @@ const buildDefinitionHtml = (entry: DictionaryResult, dictionaryName?: string): 
                 <div style="margin-bottom: 12px; display: flex;">
                     <div style="flex-shrink: 0; width: 24px; font-weight: bold;">${idx + 1}.</div>
                     <div style="flex-grow: 1;">
-                        <div style="margin-bottom: 4px;">${tagsHTML}${dictHTML}</div>
+                        <div style="margin-bottom: 4px;">${headerHTML}</div>
                         <div>${contentHTML}</div>
                     </div>
                 </div>
@@ -3973,12 +3989,9 @@ export const AnimeVideoPlayer = ({
                                                     {entry.reading}
                                                 </Typography>
                                             )}
-                                            {entry.termTags?.map((tag, tagIndex) => {
-                                                const label = getTermTagLabel(tag);
-                                                if (!label) {
-                                                    return null;
-                                                }
-                                                return (
+                                            {entry.termTags
+                                                ?.flatMap((tag) => splitTagString(getTermTagLabel(tag)))
+                                                .map((label, tagIndex) => (
                                                     <Box
                                                         key={`${entry.headword}-tag-${tagIndex}`}
                                                         sx={{
@@ -3991,8 +4004,7 @@ export const AnimeVideoPlayer = ({
                                                     >
                                                         {label}
                                                     </Box>
-                                                );
-                                            })}
+                                                ))}
                                         </Box>
                                         <Stack direction="row" spacing={1} alignItems="center">
                                             {settings.ankiConnectEnabled && (
@@ -4043,7 +4055,7 @@ export const AnimeVideoPlayer = ({
                                                                             sx={{ color: '#2ecc71' }}
                                                                             aria-label="Open in Anki"
                                                                         >
-                                                                            <MenuBookIcon fontSize="small" />
+                                                                            <MenuBookIcon sx={{ fontSize: 22, transform: 'translateY(-0.5px)' }} />
                                                                         </IconButton>
                                                                     );
                                                                 }
@@ -4056,10 +4068,19 @@ export const AnimeVideoPlayer = ({
                                                                                 handleAnkiAdd(entry);
                                                                             }}
                                                                             title="Add to Anki"
-                                                                            sx={{ color: '#4fb0ff' }}
+                                                                            sx={{ color: '#2ecc71' }}
                                                                             aria-label="Add to Anki"
                                                                         >
-                                                                            <AddCircleOutlineIcon fontSize="small" />
+                                                                            <AddCircleOutlineIcon
+                                                                                sx={{
+                                                                                    fontSize: 22,
+                                                                                    '& path': {
+                                                                                        transform: 'scale(0.9167)',
+                                                                                        transformOrigin: 'center',
+                                                                                        transformBox: 'fill-box',
+                                                                                    },
+                                                                                }}
+                                                                            />
                                                                         </IconButton>
                                                                     );
                                                                 }
@@ -4114,7 +4135,7 @@ export const AnimeVideoPlayer = ({
                                                     color: wordAudioOptions.length ? '#7cc8ff' : '#555',
                                                 }}
                                             >
-                                                <VolumeUpIcon fontSize="small" />
+                                                <VolumeUpIcon sx={{ fontSize: 22 }} />
                                             </IconButton>
                                         </Stack>
                                     </Stack>
@@ -4167,7 +4188,7 @@ export const AnimeVideoPlayer = ({
                                     {entry.glossary?.map((def, defIndex) => (
                                         <Stack key={`${entry.headword}-def-${defIndex}`} sx={{ mb: 1 }}>
                                             <Stack direction="row" spacing={1} sx={{ mb: 0.5 }}>
-                                                {def.tags?.map((tag, tagIndex) => (
+                                                {normalizeTagList(def.tags ?? []).map((tag, tagIndex) => (
                                                     <Box
                                                         key={`${entry.headword}-def-${defIndex}-tag-${tagIndex}`}
                                                         sx={{
@@ -4934,4 +4955,3 @@ export const AnimeVideoPlayer = ({
         </Box>
     );
 };
-

@@ -14,6 +14,10 @@ import {
 } from '@/Manatan/utils/wordAudio';
 import { DictionaryResult, WordAudioSource, WordAudioSourceSelection } from '@/Manatan/types';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
+import StarIcon from '@mui/icons-material/Star';
+import StarBorderIcon from '@mui/icons-material/StarBorder';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import { CropperModal } from '@/Manatan/components/CropperModal';
 
 export const StructuredContent: React.FC<{
@@ -42,14 +46,26 @@ const getNodeText = (node: any): string => {
     return '';
 };
 
+const tagStyle: React.CSSProperties = {
+    display: 'inline-block', padding: '1px 5px', borderRadius: '3px',
+    fontSize: '0.75em', fontWeight: 'bold', marginRight: '6px',
+    color: '#fff', verticalAlign: 'middle', lineHeight: '1.2'
+};
+
 const ContentNode: React.FC<{ node: any; onLinkClick?: (href: string, text: string) => void }> = ({ node, onLinkClick }) => {
     if (node === null || node === undefined) return null;
     if (typeof node === 'string' || typeof node === 'number') return <>{node}</>;
     if (Array.isArray(node)) return <>{node.map((item, i) => <ContentNode key={i} node={item} onLinkClick={onLinkClick} />)}</>;
     if (node.type === 'structured-content') return <ContentNode node={node.content} onLinkClick={onLinkClick} />;
 
-    const { tag, content, style, href } = node;
+    if (node?.data?.content === 'attribution') return null;
+
+    const { tag, content, style, href, data, title } = node;
     const s = style || {};
+    const titleAttr = typeof title === 'string' ? title : undefined;
+    const classNames = typeof data?.class === 'string' ? data.class.split(/\s+/) : [];
+    const isTagClass = classNames.includes('tag');
+    const spanStyle = isTagClass ? { ...tagStyle, backgroundColor: '#666', ...s } : s;
 
     const cellStyle: React.CSSProperties = { border: '1px solid #777', padding: '2px 8px', textAlign: 'center' };
     const tableStyle: React.CSSProperties = { 
@@ -82,7 +98,7 @@ const ContentNode: React.FC<{ node: any; onLinkClick?: (href: string, text: stri
         case 'tr': return <tr style={s}><ContentNode node={content} onLinkClick={onLinkClick} /></tr>;
         case 'th': return <th style={{ ...s, ...cellStyle, fontWeight: 'bold' }}><ContentNode node={content} onLinkClick={onLinkClick} /></th>;
         case 'td': return <td style={{ ...s, ...cellStyle }}><ContentNode node={content} onLinkClick={onLinkClick} /></td>;
-        case 'span': return <span style={s}><ContentNode node={content} onLinkClick={onLinkClick} /></span>;
+        case 'span': return <span style={spanStyle} title={titleAttr}><ContentNode node={content} onLinkClick={onLinkClick} /></span>;
         case 'div': return <div style={s}><ContentNode node={content} onLinkClick={onLinkClick} /></div>;
         case 'a':
             return (
@@ -100,11 +116,14 @@ const ContentNode: React.FC<{ node: any; onLinkClick?: (href: string, text: stri
     }
 };
 
-const tagStyle: React.CSSProperties = {
-    display: 'inline-block', padding: '1px 5px', borderRadius: '3px',
-    fontSize: '0.75em', fontWeight: 'bold', marginRight: '6px',
-    color: '#fff', verticalAlign: 'middle', lineHeight: '1.2'
-};
+const splitTagString = (tag: string): string[] =>
+    tag
+        .split(/\s+/)
+        .map((t) => t.trim())
+        .filter(Boolean);
+
+const normalizeTagList = (tags: string[]): string[] =>
+    tags.flatMap((tag) => splitTagString(tag));
 
 const AnkiButtons: React.FC<{
     entry: DictionaryResult;
@@ -206,9 +225,15 @@ const AnkiButtons: React.FC<{
             if (typeof node === 'string' || typeof node === 'number') return String(node);
             if (Array.isArray(node)) return node.map(generateHTML).join('');
             if (node.type === 'structured-content') return generateHTML(node.content);
+            if (node?.data?.content === 'attribution') return '';
 
-            const { tag, content, style, href } = node;
+            const { tag, content, style, href, data } = node;
             const customStyle = styleToString(style);
+            const classNames = typeof data?.class === 'string' ? data.class.split(/\s+/) : [];
+            const isTagClass = classNames.includes('tag');
+            const tagClassStyle = isTagClass
+                ? 'display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 0.75em; font-weight: bold; margin-right: 6px; color: #fff; background-color: #666; vertical-align: middle; line-height: 1.2;'
+                : '';
             
             let baseStyle = '';
             
@@ -234,7 +259,7 @@ const AnkiButtons: React.FC<{
                 baseStyle = 'border: 1px solid #777; padding: 2px 8px; text-align: center;';
                 return `<td style="${baseStyle}${customStyle}">${generateHTML(content)}</td>`;
             }
-            if (tag === 'span') return `<span style="${customStyle}">${generateHTML(content)}</span>`;
+            if (tag === 'span') return `<span style="${tagClassStyle}${customStyle}">${generateHTML(content)}</span>`;
             if (tag === 'div') return `<div style="${customStyle}">${generateHTML(content)}</div>`;
             if (tag === 'a') {
                 baseStyle = 'text-decoration: underline;'; 
@@ -310,11 +335,11 @@ const AnkiButtons: React.FC<{
             if (!glossaryEntries.length) return '';
             
             return glossaryEntries.map((def, idx) => {
-                const tagsHTML = def.tags.map(t => 
+                const tagsHTML = normalizeTagList(def.tags).map((t) =>
                     `<span style="display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 0.75em; font-weight: bold; margin-right: 6px; color: #fff; background-color: #666; vertical-align: middle;">${t}</span>`
-                ).join('');
-                
+                );
                 const dictHTML = `<span style="display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 0.75em; font-weight: bold; margin-right: 6px; color: #fff; background-color: #9b59b6; vertical-align: middle;">${def.dictionaryName}</span>`;
+                const headerHTML = [...tagsHTML, dictHTML].join(' ');
                 const contentHTML = def.content.map((c) => {
                     try {
                         const parsed = JSON.parse(c);
@@ -328,7 +353,7 @@ const AnkiButtons: React.FC<{
                     <div style="margin-bottom: 12px; display: flex;">
                         <div style="flex-shrink: 0; width: 24px; font-weight: bold;">${idx + 1}.</div>
                         <div style="flex-grow: 1;">
-                            <div style="margin-bottom: 4px;">${tagsHTML}${dictHTML}</div>
+                            <div style="margin-bottom: 4px;">${headerHTML}</div>
                             <div>${contentHTML}</div>
                         </div>
                     </div>
@@ -338,10 +363,13 @@ const AnkiButtons: React.FC<{
 
         // Collect all tags
         const allTags = new Set(['manatan']);
-        entry.glossary.forEach(def => def.tags.forEach(t => allTags.add(t)));
+        entry.glossary.forEach((def) => normalizeTagList(def.tags).forEach((t) => allTags.add(t)));
         entry.termTags?.forEach((t: any) => {
-            if (typeof t === 'string') allTags.add(t);
-            else if (t && typeof t === 'object' && t.name) allTags.add(t.name);
+            if (typeof t === 'string') {
+                splitTagString(t).forEach((tag) => allTags.add(tag));
+            } else if (t && typeof t === 'object' && t.name) {
+                splitTagString(t.name).forEach((tag) => allTags.add(tag));
+            }
         });
 
         const sentence = dictPopup.context?.sentence || '';
@@ -463,14 +491,34 @@ const AnkiButtons: React.FC<{
                 onClick={status === 'exists' ? handleOpen : handleAddClick}
                 disabled={status === 'loading'}
                 style={{
-                    background: 'none', border: 'none', cursor: 'pointer', padding: '5px',
-                    fontSize: '1.2em', color: status === 'exists' ? '#2ecc71' : 'var(--ocr-accent)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '2px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    lineHeight: 1,
+                    color: '#2ecc71',
                     opacity: status === 'loading' ? 0.5 : 1,
                     marginLeft: '10px'
                 }}
                 title={status === 'exists' ? "Open in Anki" : "Add to Anki"}
             >
-                {status === 'exists' ? '📖' : '➕'}
+                {status === 'exists' ? (
+                    <MenuBookIcon sx={{ fontSize: 22, transform: 'translateY(-0.5px)' }} />
+                ) : (
+                    <AddCircleOutlineIcon
+                        sx={{
+                            fontSize: 22,
+                            '& path': {
+                                transform: 'scale(0.9167)',
+                                transformOrigin: 'center',
+                                transformBox: 'fill-box',
+                            },
+                        }}
+                    />
+                )}
             </button>
 
             {showCropper && createPortal(
@@ -923,19 +971,21 @@ export const YomitanPopup = () => {
                                 </div>
                                 {entry.termTags && entry.termTags.length > 0 && (
                                     <div style={{ display: 'flex', gap: '4px' }}>
-                                        {entry.termTags.map((tag: any, idx) => {
-                                            const label = (typeof tag === 'object' && tag !== null && tag.name) 
-                                                ? tag.name 
-                                                : tag;
-                                                
-                                            return (
+                                            {entry.termTags.flatMap((tag: any) => {
+                                                const label = (typeof tag === 'object' && tag !== null && tag.name)
+                                                    ? tag.name
+                                                    : tag;
+                                                if (typeof label !== 'string') {
+                                                    return [];
+                                                }
+                                                return splitTagString(label);
+                                            }).map((label, idx) => (
                                                 <span key={idx} style={{ ...tagStyle, backgroundColor: '#666', marginRight: 0 }}>
-                                                    {String(label)}
+                                                    {label}
                                                 </span>
-                                            );
-                                        })}
-                                    </div>
-                                )}
+                                            ))}
+                                        </div>
+                                    )}
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 {settings.ankiConnectEnabled && (
@@ -962,11 +1012,12 @@ export const YomitanPopup = () => {
                                         lineHeight: 1,
                                         display: 'flex',
                                         alignItems: 'center',
+                                        justifyContent: 'center',
                                     }}
                                     disabled={!wordAudioOptions.length}
                                     aria-label="Play word audio"
                                 >
-                                    <VolumeUpIcon fontSize="small" />
+                                    <VolumeUpIcon sx={{ fontSize: 22 }} />
                                 </button>
                             </div>
                         </div>
@@ -1013,7 +1064,7 @@ export const YomitanPopup = () => {
                                         </div>
                                         <div style={{ flexGrow: 1 }}>
                                             <div style={{ marginBottom: '4px' }}>
-                                                {def.tags?.map((t, ti) => (
+                                                {normalizeTagList(def.tags || []).map((t, ti) => (
                                                     <span key={ti} style={{ ...tagStyle, backgroundColor: '#666' }}>{t}</span>
                                                 ))}
                                                 <span style={{ ...tagStyle, backgroundColor: '#9b59b6' }}>
@@ -1109,7 +1160,11 @@ export const YomitanPopup = () => {
                                     fontSize: '0.9em',
                                 }}
                         >
-                            ★
+                            {activeWordAudioSelection === 'auto' ? (
+                                <StarIcon fontSize="small" />
+                            ) : (
+                                <StarBorderIcon fontSize="small" />
+                            )}
                         </button>
                     </div>
                     {wordAudioOptions.map((source) => (
@@ -1160,7 +1215,11 @@ export const YomitanPopup = () => {
                                     fontSize: '0.9em',
                                 }}
                             >
-                                ★
+                                {activeWordAudioSelection === source ? (
+                                    <StarIcon fontSize="small" />
+                                ) : (
+                                    <StarBorderIcon fontSize="small" />
+                                )}
                             </button>
                         </div>
                     ))}
